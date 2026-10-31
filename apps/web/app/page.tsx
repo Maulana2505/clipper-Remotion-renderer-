@@ -181,7 +181,7 @@ export default function ImportPage() {
     }
   }
 
-  const showRange = rangeOpen;
+  const showRange = rangeOpen || (videoDuration !== null && videoDuration > LONG_VIDEO_SECONDS && activeNiche !== "gaming");
 
   return (
     <div className="space-y-14">
@@ -394,8 +394,10 @@ export default function ImportPage() {
                   <div className="mt-3 space-y-2">
                     {videoDuration !== null && videoDuration > LONG_VIDEO_SECONDS ? (
                       <p className="text-[11px] leading-relaxed text-amber-300/90">
-                        This video is {formatTimecode(videoDuration)} long. Pick a window so the download and
-                        transcription stay manageable.
+                        This video is {formatTimecode(videoDuration)} long.{" "}
+                        {activeNiche === "gaming"
+                          ? "Gaming processes the full video by default; set a window only if you want a shorter import."
+                          : "Pick a window so the download and transcription stay manageable."}
                       </p>
                     ) : null}
                     <div className="grid grid-cols-2 gap-2">

@@ -4,6 +4,9 @@ export type JobStatus = "queued" | "processing" | "completed" | "failed";
 
 /** Niche metadata captured per job and reused by niche layouts. */
 export interface ClipMeta {
+  title?: string | null;
+  hook?: string | null;
+  badge?: string | null;
   teams?: { home: string; away: string };
   score?: { home: number; away: number };
   minute?: string;

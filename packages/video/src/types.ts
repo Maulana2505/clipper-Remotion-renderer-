@@ -26,9 +26,35 @@ export type LayoutId =
   | 'minimal_frame'
   // Niche layouts
   | 'gaming_hud'
+  | 'gaming_hud_left'
+  | 'gaming_hud_top'
+  | 'gaming_minimal'
+  | 'gaming_neon'
+  | 'gaming_reaction'
+  | 'gaming_split'
   | 'football_scoreboard'
+  | 'football_scoreboard_bottom'
+  | 'football_minimal'
+  | 'football_broadcast'
+  | 'football_highlight'
+  | 'football_clean'
+  | 'football_vertical_stack'
   | 'duo_split'
-  | 'lower_third';
+  | 'duo_split_horizontal'
+  | 'solo_podcast'
+  | 'podcast_quote'
+  | 'podcast_chat'
+  | 'podcast_minimal'
+  | 'lower_third'
+  | 'lower_third_top'
+  | 'education_step'
+  | 'education_fact'
+  | 'education_minimal'
+  | 'education_split'
+  | 'center_focus'
+  | 'full_bleed_text'
+  | 'framed_minimal'
+  | 'cinematic_bars';
 
 export type CaptionId =
   | 'none'
@@ -77,6 +103,7 @@ export type MediaSpec = {
 
 export type ClipMeta = {
   title?: string | null;
+  hook?: string | null;
   badge?: string | null;
   /** Football */
   teams?: {home: string; away: string};

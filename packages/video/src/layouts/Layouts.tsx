@@ -592,16 +592,531 @@ const LegacyLayout: React.FC<LayoutProps> = ({props, time}) => {
   }
 };
 
+// ---------- Gaming variants ----------
+
+const GamingHudLeft: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.045);
+  const bubbleWidth = Math.round(canvas.width * 0.3);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim />
+      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.3} zoom={4} top={margin} left={canvas.width - bubbleWidth - margin} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin + bubbleWidth * 0.15} right={margin + bubbleWidth + canvas.width * 0.02} />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const GamingHudTop: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.045);
+  const bubbleWidth = Math.round(canvas.width * 0.26);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim />
+      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.26} zoom={4} top={margin} left={Math.round((canvas.width - bubbleWidth) / 2)} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin + bubbleWidth + canvas.height * 0.02} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const GamingMinimal: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim strength={0.35} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const GamingNeon: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.06);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', inset: margin, border: `3px solid ${caption.accent}`, boxShadow: `0 0 24px ${caption.accent}66, inset 0 0 24px ${caption.accent}33`, pointerEvents: 'none'}} />
+      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.24} zoom={4} top={margin * 1.5} left={margin * 1.5} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin * 1.5} right={margin * 1.5} />
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.008} />
+    </>
+  );
+};
+
+const GamingReaction: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.04);
+  const big = Math.round(canvas.width * 0.42);
+  const small = Math.round(canvas.width * 0.22);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim />
+      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.42} zoom={2.6} top={margin} left={margin} />
+      <div style={{position: 'absolute', bottom: margin, right: margin, width: small, height: Math.round(small * 0.75), borderRadius: small * 0.08, overflow: 'hidden', border: `3px solid ${caption.accent}`, boxShadow: '0 12px 30px rgba(0,0,0,0.5)'}}>
+        <FocusMedia props={props} focus={faceAt(props.face?.keyframes, time)} zoom={1.4} width={small} height={Math.round(small * 0.75)} style={{position: 'absolute', inset: 0}} />
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin + big * 0.05} right={margin} />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const GamingSplit: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const half = Math.round(canvas.height * 0.5);
+  const face = faceAt(props.face?.keyframes, time);
+  return (
+    <>
+      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: half, overflow: 'hidden'}}>
+        <MainMedia props={props} style={{objectFit: 'cover'}} />
+      </div>
+      <div style={{position: 'absolute', top: half, left: 0, right: 0, height: canvas.height - half, overflow: 'hidden', background: '#08090b'}}>
+        <FocusMedia props={props} focus={face} zoom={2.2} width={canvas.width} height={canvas.height - half} style={{position: 'absolute', inset: 0}} />
+      </div>
+      <div style={{position: 'absolute', top: half - 2, left: 0, right: 0, height: 4, background: caption.accent, boxShadow: `0 0 16px ${caption.accent}`}} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.04} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+// ---------- Football variants ----------
+
+const FootballScoreboardBottom: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const width = Math.round(canvas.width * 0.88);
+  const fontSize = Math.round(Math.min(canvas.width, canvas.height) * 0.05);
+  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
+  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
+  const competition = meta?.competition?.toUpperCase();
+  const minute = meta?.minute;
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', bottom: Math.round(canvas.height * 0.12), left: Math.round((canvas.width - width) / 2), width, borderRadius: Math.round(fontSize * 0.28), overflow: 'hidden', boxShadow: '0 18px 44px rgba(0,0,0,0.55)', fontFamily: fontFamilyOf('archivo_black')}}>
+        {competition ? (<div style={{background: caption.accent, color: '#0b0b0b', fontSize: Math.round(fontSize * 0.42), letterSpacing: '0.14em', textAlign: 'center', padding: `${Math.round(fontSize * 0.14)}px 0`}}>{competition}</div>) : null}
+        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: Math.round(fontSize * 0.3), background: 'rgba(8,9,11,0.86)', padding: `${Math.round(fontSize * 0.34)}px ${Math.round(fontSize * 0.55)}px`}}>
+          <div style={{flex: 1, color: '#fff', fontSize, textAlign: 'left'}}>{home}</div>
+          <div style={{display: 'flex', alignItems: 'center', gap: Math.round(fontSize * 0.25)}}>
+            <div style={{color: '#fff', fontSize: Math.round(fontSize * 1.25)}}>{scoreText(meta)}</div>
+            {minute ? (<div style={{background: caption.accent, color: '#0b0b0b', fontSize: Math.round(fontSize * 0.5), padding: `${Math.round(fontSize * 0.1)}px ${Math.round(fontSize * 0.28)}px`, borderRadius: 999}}>{minute}</div>) : null}
+          </div>
+          <div style={{flex: 1, color: '#fff', fontSize, textAlign: 'right'}}>{away}</div>
+        </div>
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const FootballMinimal: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const fontSize = Math.round(Math.min(canvas.width, canvas.height) * 0.09);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim strength={0.4} />
+      <div style={{position: 'absolute', top: canvas.height * 0.06, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black'), fontSize, color: '#fff', textShadow: '0 6px 24px rgba(0,0,0,0.9)'}}>{scoreText(meta)}</div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.16} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const FootballBroadcast: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
+  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
+  const competition = meta?.competition?.toUpperCase();
+  const minute = meta?.minute;
+  const barH = Math.round(canvas.height * 0.11);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: barH, background: 'rgba(8,9,11,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${Math.round(canvas.width * 0.05)}px`, fontFamily: fontFamilyOf('archivo_black')}}>
+        <div style={{color: '#fff', fontSize: Math.round(barH * 0.45), flex: 1, textAlign: 'left'}}>{home}</div>
+        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2}}>
+          <div style={{color: caption.accent, fontSize: Math.round(barH * 0.6), letterSpacing: '0.05em'}}>{scoreText(meta)}</div>
+          {competition ? (<div style={{color: '#aaa', fontSize: Math.round(barH * 0.22), letterSpacing: '0.12em'}}>{competition}{minute ? ` · ${minute}` : ''}</div>) : null}
+        </div>
+        <div style={{color: '#fff', fontSize: Math.round(barH * 0.45), flex: 1, textAlign: 'right'}}>{away}</div>
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={barH + canvas.height * 0.04} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const FootballHighlight: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
+  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim strength={0.6} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" scale={1.3} />
+      <div style={{position: 'absolute', top: canvas.height * 0.22, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black')}}>
+        <div style={{color: '#fff', fontSize: Math.round(canvas.height * 0.05), letterSpacing: '0.08em'}}>{home} vs {away}</div>
+        <div style={{color: caption.accent, fontSize: Math.round(canvas.height * 0.13), marginTop: canvas.height * 0.02}}>{scoreText(meta)}</div>
+        {meta?.minute ? (<div style={{color: '#fff', fontSize: Math.round(canvas.height * 0.04), marginTop: canvas.height * 0.01}}>{meta.minute}</div>) : null}
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const FootballClean: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
+  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', top: canvas.height * 0.06, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black'), fontSize: Math.round(canvas.height * 0.05), color: '#fff', textShadow: '0 4px 18px rgba(0,0,0,0.8)'}}>
+        {home} <span style={{color: caption.accent}}>{scoreText(meta)}</span> {away}
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.13} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const FootballVerticalStack: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
+  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
+  const fs = Math.round(canvas.height * 0.06);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim strength={0.5} />
+      <div style={{position: 'absolute', top: canvas.height * 0.06, left: canvas.width * 0.06, fontFamily: fontFamilyOf('archivo_black'), fontSize: fs, color: '#fff', textAlign: 'left', lineHeight: 1.1}}>
+        <div>{home}</div>
+        <div style={{color: caption.accent, fontSize: fs * 1.4}}>{meta?.score?.home ?? 0}</div>
+      </div>
+      <div style={{position: 'absolute', bottom: canvas.height * 0.16, right: canvas.width * 0.06, fontFamily: fontFamilyOf('archivo_black'), fontSize: fs, color: '#fff', textAlign: 'right', lineHeight: 1.1}}>
+        <div>{away}</div>
+        <div style={{color: caption.accent, fontSize: fs * 1.4}}>{meta?.score?.away ?? 0}</div>
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.45} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+// ---------- Podcast variants ----------
+
+const DuoSplitHorizontal: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const half = Math.round(canvas.width * 0.5);
+  const face = faceAt(props.face?.keyframes, time);
+  return (
+    <>
+      <div style={{position: 'absolute', top: 0, left: 0, width: half, height: canvas.height, overflow: 'hidden'}}>
+        <MainMedia props={props} style={{objectFit: 'cover'}} />
+      </div>
+      <div style={{position: 'absolute', top: 0, left: half, width: canvas.width - half, height: canvas.height, overflow: 'hidden', background: '#08090b'}}>
+        <FocusMedia props={props} focus={face} zoom={2.4} width={canvas.width - half} height={canvas.height} style={{position: 'absolute', inset: 0}} />
+      </div>
+      <div style={{position: 'absolute', top: 0, left: half - 2, width: 4, height: canvas.height, background: caption.accent}} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} left={canvas.width * 0.04} />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const SoloPodcast: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const name = meta?.speaker || 'SPEAKER';
+  const topic = meta?.topic;
+  const cardW = Math.round(canvas.width * 0.88);
+  const cardH = Math.round(canvas.height * 0.12);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim strength={0.5} />
+      <div style={{position: 'absolute', bottom: canvas.height * 0.14, left: Math.round((canvas.width - cardW) / 2), width: cardW, height: cardH, background: 'rgba(8,9,11,0.82)', borderRadius: Math.round(cardH * 0.18), display: 'flex', alignItems: 'center', padding: `0 ${Math.round(cardW * 0.05)}px`, gap: Math.round(cardW * 0.03), boxShadow: '0 14px 40px rgba(0,0,0,0.5)'}}>
+        <div style={{width: Math.round(cardH * 0.7), height: Math.round(cardH * 0.7), borderRadius: '50%', background: caption.accent}} />
+        <div style={{flex: 1, fontFamily: fontFamilyOf('archivo_black')}}>
+          <div style={{color: '#fff', fontSize: Math.round(cardH * 0.34)}}>{String(name).toUpperCase()}</div>
+          {topic ? (<div style={{color: caption.accent, fontSize: Math.round(cardH * 0.26), marginTop: 2}}>{topic}</div>) : null}
+        </div>
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const PodcastQuote: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const quote = meta?.title || meta?.title || '';
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)'}} />
+      <div style={{position: 'absolute', top: '35%', left: canvas.width * 0.08, right: canvas.width * 0.08, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black'), fontSize: Math.round(canvas.height * 0.06), color: '#fff', lineHeight: 1.2, textShadow: '0 8px 30px rgba(0,0,0,0.9)'}}>
+        {quote ? `"${quote}"` : ''}
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const PodcastChat: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const hook = meta?.title || '';
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim />
+      <div style={{position: 'absolute', bottom: canvas.height * 0.16, left: canvas.width * 0.06, right: canvas.width * 0.06}}>
+        <div style={{background: caption.accent, color: '#0b0b0b', fontFamily: fontFamilyOf('archivo_black'), fontSize: Math.round(canvas.height * 0.04), padding: `${Math.round(canvas.height * 0.015)}px ${Math.round(canvas.width * 0.04)}px`, borderRadius: Math.round(canvas.height * 0.02), display: 'inline-block', maxWidth: '88%', boxShadow: '0 12px 30px rgba(0,0,0,0.5)'}}>
+          {hook || '...'}
+        </div>
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="left" left={canvas.width * 0.06} />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const PodcastMinimal: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.04);
+  const bw = Math.round(canvas.width * 0.34);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.34} zoom={3} top={margin} left={Math.round((canvas.width - bw) / 2)} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin + bw + canvas.height * 0.02} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+// ---------- Education variants ----------
+
+const LowerThirdTop: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const title = meta?.title || meta?.topic || '';
+  const cardW = Math.round(canvas.width * 0.86);
+  const cardH = Math.round(canvas.height * 0.11);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', top: canvas.height * 0.06, left: Math.round((canvas.width - cardW) / 2), width: cardW, height: cardH, background: caption.accent, borderRadius: Math.round(cardH * 0.18), display: 'flex', alignItems: 'center', padding: `0 ${Math.round(cardW * 0.05)}px`, boxShadow: '0 14px 40px rgba(0,0,0,0.5)'}}>
+        <div style={{fontFamily: fontFamilyOf('inter'), fontSize: Math.round(cardH * 0.4), color: '#0b0b0b', fontWeight: 700}}>{title}</div>
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.2} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const EducationStep: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const title = meta?.title || meta?.topic || '';
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim strength={0.5} />
+      <div style={{position: 'absolute', bottom: canvas.height * 0.18, left: canvas.width * 0.06, right: canvas.width * 0.06, display: 'flex', alignItems: 'center', gap: canvas.width * 0.03}}>
+        <div style={{width: Math.round(canvas.height * 0.09), height: Math.round(canvas.height * 0.09), borderRadius: '50%', background: caption.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.height * 0.05), color: '#0b0b0b', fontWeight: 800}}>1</div>
+        <div style={{flex: 1, fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.height * 0.04), color: '#fff', fontWeight: 600, lineHeight: 1.2}}>{title}</div>
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="left" left={canvas.width * 0.06} />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const EducationFact: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const title = meta?.title || meta?.topic || '';
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', top: canvas.height * 0.12, left: canvas.width * 0.06, right: canvas.width * 0.06, background: 'rgba(8,9,11,0.82)', borderRadius: Math.round(canvas.height * 0.02), padding: `${Math.round(canvas.height * 0.025)}px ${Math.round(canvas.width * 0.04)}px`, borderLeft: `6px solid ${caption.accent}`}}>
+        <div style={{fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.height * 0.022), color: caption.accent, fontWeight: 700, letterSpacing: '0.12em', marginBottom: 6}}>FAKTA</div>
+        <div style={{fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.height * 0.038), color: '#fff', fontWeight: 600, lineHeight: 1.3}}>{title}</div>
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} right={canvas.width * 0.06} />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const EducationMinimal: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const title = meta?.title || meta?.topic || '';
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', bottom: canvas.height * 0.16, left: canvas.width * 0.06, right: canvas.width * 0.06, fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.height * 0.04), color: '#fff', fontWeight: 600, textShadow: '0 4px 18px rgba(0,0,0,0.9)', lineHeight: 1.2}}>
+        {title}
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const EducationSplit: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const topH = Math.round(canvas.height * 0.55);
+  const title = meta?.title || meta?.topic || '';
+  return (
+    <>
+      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: topH, overflow: 'hidden'}}>
+        <MainMedia props={props} style={{objectFit: 'cover'}} />
+      </div>
+      <div style={{position: 'absolute', top: topH, left: 0, right: 0, height: canvas.height - topH, background: 'rgba(8,9,11,0.92)', padding: `${Math.round(canvas.height * 0.03)}px ${Math.round(canvas.width * 0.06)}px`}}>
+        <div style={{fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.height * 0.04), color: '#fff', fontWeight: 700, lineHeight: 1.2}}>{title}</div>
+        {meta?.title ? (<div style={{fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.height * 0.03), color: caption.accent, marginTop: canvas.height * 0.015}}>{meta.hook}</div>) : null}
+      </div>
+      <div style={{position: 'absolute', top: topH - 2, left: 0, right: 0, height: 4, background: caption.accent}} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.04} right={canvas.width * 0.06} />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+// ---------- Generic / Common ----------
+
+const CenterFocus: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const face = faceAt(props.face?.keyframes, time);
+  const size = Math.round(canvas.width * 0.5);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover', filter: 'brightness(0.55)'}} />
+      <div style={{position: 'absolute', top: Math.round((canvas.height - size) / 2), left: Math.round((canvas.width - size) / 2), width: size, height: size, borderRadius: '50%', overflow: 'hidden', border: `6px solid ${caption.accent}`, boxShadow: `0 0 40px ${caption.accent}55`}}>
+        <FocusMedia props={props} focus={face} zoom={2.2} width={size} height={size} style={{position: 'absolute', inset: 0}} />
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const FullBleedText: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const title = meta?.title || meta?.title || '';
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.85) 100%)'}} />
+      <div style={{position: 'absolute', bottom: canvas.height * 0.16, left: canvas.width * 0.06, right: canvas.width * 0.06, fontFamily: fontFamilyOf(caption.font), fontSize: Math.round(canvas.height * 0.05), color: '#fff', fontWeight: 800, lineHeight: 1.15, textShadow: '0 6px 24px rgba(0,0,0,0.9)'}}>
+        {title}
+      </div>
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="left" left={canvas.width * 0.06} />
+      <ProgressBar accent={caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const FramedMinimal: React.FC<LayoutProps> = ({props}) => {
+  const {canvas} = props;
+  const inset = Math.round(canvas.width * 0.05);
+  return (
+    <>
+      <div style={{position: 'absolute', inset: 0, background: '#08090b'}} />
+      <div style={{position: 'absolute', top: inset, left: inset, right: inset, bottom: inset, borderRadius: Math.round(canvas.width * 0.02), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.18)'}}>
+        <MainMedia props={props} style={{objectFit: 'cover'}} />
+      </div>
+      <ProgressBar accent={props.caption.accent} canvas={canvas} />
+    </>
+  );
+};
+
+const CinematicBars: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const bar = Math.round(canvas.height * 0.12);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: bar, background: '#000'}} />
+      <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, height: bar, background: '#000'}} />
+      <div style={{position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.55) 100%)', pointerEvents: 'none'}} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={bar + canvas.height * 0.04} align="center" />
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.004} />
+    </>
+  );
+};
+
 export const ClipLayout: React.FC<LayoutProps> = ({props, time}) => {
   switch (props.layout) {
     case 'gaming_hud':
       return <GamingHud props={props} time={time} />;
+    case 'gaming_hud_left':
+      return <GamingHudLeft props={props} time={time} />;
+    case 'gaming_hud_top':
+      return <GamingHudTop props={props} time={time} />;
+    case 'gaming_minimal':
+      return <GamingMinimal props={props} time={time} />;
+    case 'gaming_neon':
+      return <GamingNeon props={props} time={time} />;
+    case 'gaming_reaction':
+      return <GamingReaction props={props} time={time} />;
+    case 'gaming_split':
+      return <GamingSplit props={props} time={time} />;
     case 'football_scoreboard':
       return <FootballScoreboard props={props} time={time} />;
+    case 'football_scoreboard_bottom':
+      return <FootballScoreboardBottom props={props} time={time} />;
+    case 'football_minimal':
+      return <FootballMinimal props={props} time={time} />;
+    case 'football_broadcast':
+      return <FootballBroadcast props={props} time={time} />;
+    case 'football_highlight':
+      return <FootballHighlight props={props} time={time} />;
+    case 'football_clean':
+      return <FootballClean props={props} time={time} />;
+    case 'football_vertical_stack':
+      return <FootballVerticalStack props={props} time={time} />;
     case 'duo_split':
       return <DuoSplit props={props} time={time} />;
+    case 'duo_split_horizontal':
+      return <DuoSplitHorizontal props={props} time={time} />;
+    case 'solo_podcast':
+      return <SoloPodcast props={props} time={time} />;
+    case 'podcast_quote':
+      return <PodcastQuote props={props} time={time} />;
+    case 'podcast_chat':
+      return <PodcastChat props={props} time={time} />;
+    case 'podcast_minimal':
+      return <PodcastMinimal props={props} time={time} />;
     case 'lower_third':
       return <LowerThird props={props} time={time} />;
+    case 'lower_third_top':
+      return <LowerThirdTop props={props} time={time} />;
+    case 'education_step':
+      return <EducationStep props={props} time={time} />;
+    case 'education_fact':
+      return <EducationFact props={props} time={time} />;
+    case 'education_minimal':
+      return <EducationMinimal props={props} time={time} />;
+    case 'education_split':
+      return <EducationSplit props={props} time={time} />;
+    case 'center_focus':
+      return <CenterFocus props={props} time={time} />;
+    case 'full_bleed_text':
+      return <FullBleedText props={props} time={time} />;
+    case 'framed_minimal':
+      return <FramedMinimal props={props} time={time} />;
+    case 'cinematic_bars':
+      return <CinematicBars props={props} time={time} />;
     default:
       return <LegacyLayout props={props} time={time} />;
   }
