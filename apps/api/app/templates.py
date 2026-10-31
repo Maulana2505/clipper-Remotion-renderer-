@@ -1,0 +1,231 @@
+from __future__ import annotations
+
+CANVAS_PRESETS: list[dict] = [
+    {
+        "id": "vertical_9x16",
+        "name": "9:16 Vertical",
+        "width": 1080,
+        "height": 1920,
+        "platform": "TikTok / Reels / Shorts",
+        "safe_area": {"top": 0.08, "bottom": 0.15, "left": 0.05, "right": 0.12},
+    },
+    {
+        "id": "portrait_4x5",
+        "name": "4:5 Portrait",
+        "width": 1080,
+        "height": 1350,
+        "platform": "Instagram Feed",
+        "safe_area": {"top": 0.06, "bottom": 0.12, "left": 0.06, "right": 0.06},
+    },
+    {
+        "id": "square_1x1",
+        "name": "1:1 Square",
+        "width": 1080,
+        "height": 1080,
+        "platform": "Universal Feed",
+        "safe_area": {"top": 0.06, "bottom": 0.10, "left": 0.06, "right": 0.06},
+    },
+    {
+        "id": "landscape_16x9",
+        "name": "16:9 Landscape",
+        "width": 1920,
+        "height": 1080,
+        "platform": "YouTube",
+        "safe_area": {"top": 0.05, "bottom": 0.10, "left": 0.05, "right": 0.05},
+    },
+    {
+        "id": "portrait_3x4",
+        "name": "3:4 Portrait",
+        "width": 1080,
+        "height": 1440,
+        "platform": "Portrait",
+        "safe_area": {"top": 0.06, "bottom": 0.12, "left": 0.06, "right": 0.06},
+    },
+    {
+        "id": "portrait_2x3",
+        "name": "2:3 Portrait",
+        "width": 1080,
+        "height": 1620,
+        "platform": "Pinterest",
+        "safe_area": {"top": 0.08, "bottom": 0.12, "left": 0.06, "right": 0.06},
+    },
+    {
+        "id": "landscape_4x3",
+        "name": "4:3 Landscape",
+        "width": 1440,
+        "height": 1080,
+        "platform": "Presentation",
+        "safe_area": {"top": 0.05, "bottom": 0.10, "left": 0.05, "right": 0.05},
+    },
+    {
+        "id": "cinema_21x9",
+        "name": "21:9 Cinematic",
+        "width": 2560,
+        "height": 1080,
+        "platform": "Cinematic",
+        "safe_area": {"top": 0.05, "bottom": 0.08, "left": 0.05, "right": 0.05},
+    },
+]
+
+VIDEO_TEMPLATES: list[dict] = [
+    {"id": "auto_crop", "name": "Auto Face Crop", "description": "Face tracking crop", "requires_face_track": True},
+    {"id": "center_crop", "name": "Center Crop", "description": "Center crop without face tracking", "requires_face_track": False},
+    {"id": "blur_bg", "name": "Blurred Background", "description": "Full video with blurred fill", "requires_face_track": False},
+    {"id": "framed", "name": "Framed", "description": "Video with padding and border", "requires_face_track": False},
+    {"id": "split_top_bottom", "name": "Split Screen", "description": "Two stacked crops", "requires_face_track": True},
+    {"id": "cam_overlay", "name": "Cam Overlay", "description": "Speaker overlay", "requires_face_track": True},
+    {"id": "letterbox_title", "name": "Letterbox Title", "description": "Cinematic bars with title", "requires_face_track": False},
+    {"id": "hook_intro", "name": "Hook Intro", "description": "Opening title card", "requires_face_track": False},
+    {"id": "progress_bar", "name": "Progress Bar", "description": "Thin animated progress bar", "requires_face_track": False},
+    {"id": "minimal_frame", "name": "Minimal Frame", "description": "Clean border and padding", "requires_face_track": False},
+    {"id": "gaming_hud", "name": "Gaming HUD", "description": "Facecam bubble, mood badge, progress bar", "requires_face_track": True, "niche": "gaming"},
+    {"id": "football_scoreboard", "name": "Football Scoreboard", "description": "Teams, score, minute and competition", "requires_face_track": False, "niche": "football"},
+    {"id": "duo_split", "name": "Duo Split", "description": "Two speakers stacked with name tags", "requires_face_track": False, "niche": "podcast"},
+    {"id": "lower_third", "name": "Lower Third", "description": "Speaker and topic card", "requires_face_track": False, "niche": "education"},
+]
+
+CAPTION_TEMPLATES: list[dict] = [
+    {"id": "none", "name": "None", "description": "No captions", "animation": "none"},
+    {"id": "plain_white", "name": "Plain White", "description": "Clean white text", "animation": "fade"},
+    {"id": "glow_neon", "name": "Glow Neon", "description": "Neon green glow", "animation": "pop"},
+    {"id": "subtract_box", "name": "Subtract Box", "description": "Semi-transparent box", "animation": "fade"},
+    {"id": "karaoke_highlight", "name": "Karaoke Highlight", "description": "Active word highlight", "animation": "highlight"},
+    {"id": "bold_outline", "name": "Bold Outline", "description": "Heavy outline", "animation": "pop"},
+    {"id": "minimal_lower", "name": "Minimal Lower Third", "description": "Small lower text", "animation": "fade"},
+    {"id": "gradient_pop", "name": "Gradient Pop", "description": "Bright gradient", "animation": "pop"},
+    {"id": "typewriter", "name": "Typewriter", "description": "Word-by-word reveal", "animation": "typewriter"},
+    {"id": "bounce_word", "name": "Bounce Word", "description": "Bouncy words", "animation": "bounce"},
+    {"id": "neon_blue", "name": "Neon Blue", "description": "Blue neon glow", "animation": "pop"},
+    {"id": "yellow_highlight", "name": "Yellow Highlight", "description": "Yellow background", "animation": "highlight"},
+    {"id": "accent_pop", "name": "Accent Pop", "description": "Line pop with accent word", "animation": "pop"},
+    {"id": "accent_highlight", "name": "Accent Highlight", "description": "Stroke text with accent karaoke", "animation": "highlight"},
+]
+
+FONT_PRESETS: list[dict] = [
+    {"id": "anton", "name": "Anton", "family": "Anton"},
+    {"id": "oswald", "name": "Oswald", "family": "Oswald"},
+    {"id": "inter", "name": "Inter", "family": "Inter"},
+    {"id": "montserrat", "name": "Montserrat", "family": "Montserrat"},
+    {"id": "pinyon", "name": "Pinyon Script", "family": "Pinyon Script"},
+    {"id": "eb_garamond", "name": "EB Garamond", "family": "EB Garamond"},
+    {"id": "bebas_neue", "name": "Bebas Neue", "family": "Bebas Neue"},
+    {"id": "archivo_black", "name": "Archivo Black", "family": "Archivo Black"},
+]
+
+PRESETS: list[dict] = [
+    {
+        "id": "tiktok_viral",
+        "name": "TikTok Viral",
+        "canvas": "vertical_9x16",
+        "video_template": "auto_crop",
+        "caption_template": "glow_neon",
+        "font_preset": "anton",
+    },
+    {
+        "id": "reels_clean",
+        "name": "Reels Clean",
+        "canvas": "vertical_9x16",
+        "video_template": "blur_bg",
+        "caption_template": "plain_white",
+        "font_preset": "oswald",
+    },
+    {
+        "id": "ig_feed",
+        "name": "IG Feed",
+        "canvas": "square_1x1",
+        "video_template": "framed",
+        "caption_template": "subtract_box",
+        "font_preset": "eb_garamond",
+    },
+    {
+        "id": "ig_portrait",
+        "name": "IG Portrait",
+        "canvas": "portrait_4x5",
+        "video_template": "auto_crop",
+        "caption_template": "bold_outline",
+        "font_preset": "anton",
+    },
+    {
+        "id": "youtube_clip",
+        "name": "YouTube Clip",
+        "canvas": "landscape_16x9",
+        "video_template": "center_crop",
+        "caption_template": "minimal_lower",
+        "font_preset": "inter",
+    },
+    {
+        "id": "cinematic",
+        "name": "Cinematic",
+        "canvas": "cinema_21x9",
+        "video_template": "letterbox_title",
+        "caption_template": "subtract_box",
+        "font_preset": "eb_garamond",
+    },
+]
+
+CANVAS_BY_ID = {item["id"]: item for item in CANVAS_PRESETS}
+CAPTION_BY_ID = {item["id"]: item for item in CAPTION_TEMPLATES}
+FONT_BY_ID = {item["id"]: item for item in FONT_PRESETS}
+VIDEO_BY_ID = {item["id"]: item for item in VIDEO_TEMPLATES}
+
+# Starting presets per channel niche. Defaults only: every field can be
+# overridden per channel and again per clip.
+NICHE_PRESETS: list[dict] = [
+    {
+        "id": "gaming",
+        "name": "Gaming",
+        "canvas": "vertical_9x16",
+        "video_template": "gaming_hud",
+        "caption_template": "accent_highlight",
+        "font_preset": "anton",
+        "accent": "#CCFF00",
+        "badges": ["CLUTCH", "JUMPSCARE", "INSANE", "GG"],
+        "clip_focus": "clutch plays, jumpscares, rage moments, funny fails, reaction peaks",
+    },
+    {
+        "id": "football",
+        "name": "Football",
+        "canvas": "vertical_9x16",
+        "video_template": "football_scoreboard",
+        "caption_template": "accent_pop",
+        "font_preset": "archivo_black",
+        "accent": "#FF4D00",
+        "badges": ["GOL", "PENALTI", "KARTU MERAH", "SAVE"],
+        "clip_focus": "goals, saves, fouls, referee controversy, crowd reactions, commentary peaks",
+    },
+    {
+        "id": "podcast",
+        "name": "Podcast / Reaction",
+        "canvas": "vertical_9x16",
+        "video_template": "duo_split",
+        "caption_template": "accent_highlight",
+        "font_preset": "archivo_black",
+        "accent": "#FFD400",
+        "badges": ["HOT TAKE", "NGELAG", "PLOT TWIST"],
+        "clip_focus": "hot takes, disagreements, funny stories, surprising admissions",
+    },
+    {
+        "id": "education",
+        "name": "Education",
+        "canvas": "vertical_9x16",
+        "video_template": "lower_third",
+        "caption_template": "plain_white",
+        "font_preset": "inter",
+        "accent": "#00E5FF",
+        "badges": ["TIP", "FAKTA", "STEP"],
+        "clip_focus": "clear explanations, actionable tips, myth corrections, strong examples",
+    },
+    {
+        "id": "generic",
+        "name": "Generic",
+        "canvas": "vertical_9x16",
+        "video_template": "auto_crop",
+        "caption_template": "plain_white",
+        "font_preset": "anton",
+        "accent": "#CCFF00",
+        "badges": ["HIGHLIGHT"],
+        "clip_focus": "strong hooks, conflict, punchlines, emotional peaks",
+    },
+]
+
+NICHE_BY_ID = {item["id"]: item for item in NICHE_PRESETS}

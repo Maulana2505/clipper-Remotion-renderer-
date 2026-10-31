@@ -1,0 +1,19 @@
+{
+  "name": "@clipper/video",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "react": ">=19",
+    "remotion": "^4.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.2",
+    "typescript": "5.7.2"
+  }
+}

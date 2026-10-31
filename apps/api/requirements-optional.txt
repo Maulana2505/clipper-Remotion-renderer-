@@ -1,0 +1,7 @@
+# Optional media intelligence. If these are missing, the app falls back
+# gracefully to subtitles / heuristic clips and center crop.
+faster-whisper==1.1.1
+requests>=2.31
+av==12.3.0
+opencv-python-headless==4.10.0.84
+numpy==2.2.1
