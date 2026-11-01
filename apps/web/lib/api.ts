@@ -47,6 +47,8 @@ export interface CropSettings {
 export interface OverlaySettings {
   id?: string;
   shape: "circle" | "rounded" | "square";
+  source_url?: string | null;
+  framePrefix?: string;
   x: number;
   y: number;
   size: number;

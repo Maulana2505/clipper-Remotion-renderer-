@@ -25,6 +25,8 @@ export type CropSettings = {
 export type OverlaySettings = {
   id?: string;
   shape: 'circle' | 'rounded' | 'square';
+  source_url?: string | null;
+  framePrefix?: string;
   /** Normalised centre of the bubble on the canvas. */
   x: number;
   y: number;

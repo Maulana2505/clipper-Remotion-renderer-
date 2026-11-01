@@ -1592,6 +1592,18 @@ function OverlaysEditor({
               <option value="square">Square</option>
             </select>
           </label>
+          <label className="block text-[10px] text-zinc-500">
+            Source URL (optional, different video)
+            <input
+              type="text"
+              value={overlay.source_url || ""}
+              onChange={(event) =>
+                overlay.id && update(overlay.id, { source_url: event.target.value || null })
+              }
+              placeholder="https://... or leave empty for main video"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-panel2 px-2 py-1.5 text-xs text-white"
+            />
+          </label>
           {(
             [
               { key: "size", label: "Size", min: 5, max: 80, step: 1, value: Math.round(overlay.size * 100) },

@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..core.config import FFMPEG, JOBS_DIR
+from ..services.media import download_video
 from .media import MediaError, run
 
 RENDER_APP_DIR = Path(__file__).resolve().parents[3] / "render"
@@ -45,7 +46,7 @@ def _frame_count(duration: float, fps: int = FPS) -> int:
     return max(1, round(duration * fps))
 
 
-def _extract_frames(source: Path, start: float, end: float, out_dir: Path) -> int:
+def _extract_frames(source: Path, start: float, end: float, out_dir: Path, prefix: str = "main") -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     duration = max(0.1, end - start)
     # Keep the source aspect ratio: scale the long edge, never distort.
@@ -69,18 +70,49 @@ def _extract_frames(source: Path, start: float, end: float, out_dir: Path) -> in
         str(_frame_count(duration)),
         "-q:v",
         str(JPEG_QUALITY),
-        str(out_dir / "main-%04d.jpg"),
+        str(out_dir / f"{prefix}-%04d.jpg"),
     ]
     result = run(cmd, timeout=60 * 20)
     if result.returncode != 0:
         raise MediaError(f"Frame extraction failed: {result.stderr[-400:]}")
-    produced = len(list(out_dir.glob("main-*.jpg")))
+    produced = len(list(out_dir.glob(f"{prefix}-*.jpg")))
     if produced == 0:
         raise MediaError("Frame extraction produced no frames.")
     return produced
 
 
-def _extract_audio(source: Path, start: float, end: float, destination: Path) -> bool:
+def _extract_frames_loop(source: Path, frame_count: int, out_dir: Path, prefix: str) -> int:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    duration = max(0.1, frame_count / FPS)
+    scale = (
+        f"scale=w='if(gte(iw,ih),{MAX_FRAME_WIDTH},-2)':"
+        f"h='if(gte(iw,ih),-2,{MAX_FRAME_WIDTH})'"
+    )
+    cmd = [
+        FFMPEG,
+        "-hide_banner",
+        "-y",
+        "-stream_loop",
+        "-1",
+        "-i",
+        str(source),
+        "-t",
+        f"{duration:.3f}",
+        "-vf",
+        f"fps={FPS},{scale}",
+        "-frames:v",
+        str(frame_count),
+        "-q:v",
+        str(JPEG_QUALITY),
+        str(out_dir / f"{prefix}-%04d.jpg"),
+    ]
+    result = run(cmd, timeout=60 * 20)
+    if result.returncode != 0:
+        raise MediaError(f"Frame extraction failed: {result.stderr[-400:]}")
+    produced = len(list(out_dir.glob(f"{prefix}-*.jpg")))
+    if produced == 0:
+        raise MediaError("Frame extraction produced no frames.")
+    return produced
     duration = max(0.1, end - start)
     cmd = [
         FFMPEG,
@@ -282,11 +314,32 @@ def render_clip_remotion(*,
         # can never be missing.
         effective_end = start + frames / FPS
 
+        # Extract frames for overlays that use a different source video.
+        overlays = [dict(o) for o in (clip.get("overlays") or [])]
+        main_source_str = str(source)
+        for overlay in overlays:
+            source_url = (overlay.get("source_url") or "").strip()
+            if not source_url or source_url == main_source_str:
+                overlay["framePrefix"] = f"renders/{workspace.name}/frames/main-"
+                continue
+            try:
+                if Path(source_url).exists():
+                    overlay_source = Path(source_url)
+                else:
+                    dest = workspace / f"overlay-src-{overlay.get('id') or 'x'}.mp4"
+                    overlay_source = download_video(source_url, dest)
+                prefix = f"overlay-{overlay.get('id') or 'x'}"
+                _extract_frames_loop(overlay_source, frames, frames_dir, prefix)
+                overlay["framePrefix"] = f"renders/{workspace.name}/frames/{prefix}-"
+            except Exception as exc:  # noqa: BLE001
+                print(f"[render] overlay source failed: {exc}")
+                overlay["framePrefix"] = None
+
         has_audio = _extract_audio(source, start, effective_end, audio)
         if on_progress:
             on_progress(20)
 
-        aligned_clip = {**clip, "start_time": start, "end_time": effective_end}
+        aligned_clip = {**clip, "start_time": start, "end_time": effective_end, "overlays": overlays}
         props = build_props(
             canvas=canvas,
             clip=aligned_clip,

@@ -45,6 +45,7 @@ class OverlaySettings(BaseModel):
 
     id: str | None = None
     shape: Literal["circle", "rounded", "square"] = "circle"
+    source_url: str | None = None
     x: float = Field(default=0.5, ge=0.0, le=1.0)
     y: float = Field(default=0.5, ge=0.0, le=1.0)
     size: float = Field(default=0.26, ge=0.05, le=0.8)

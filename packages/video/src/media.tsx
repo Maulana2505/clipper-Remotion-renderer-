@@ -245,6 +245,9 @@ export const OverlayBubble: React.FC<{
     backgroundColor: '#000',
   };
 
+  const sourceUrl = overlay.source_url || props.source.url;
+  const framePrefix = overlay.framePrefix;
+
   const coverScale = Math.max(width / props.source.width, height / props.source.height);
   const totalZoom = Math.max(1, crop.zoom);
   const displayWidth = props.source.width * coverScale * totalZoom;
@@ -259,11 +262,14 @@ export const OverlayBubble: React.FC<{
 
   return (
     <div style={shell}>
-      {framesMode && frames ? (
-        <Img src={frameSrc(frames.mainPrefix, frame, frames.extension, frames.digits)} style={inner} />
+      {framesMode && (framePrefix || frames) ? (
+        <Img
+          src={frameSrc((framePrefix || frames!.mainPrefix), frame, (frames?.extension || '.jpg'), (frames?.digits || 4))}
+          style={inner}
+        />
       ) : (
         <Video
-          src={resolveSrc(props.source.url)}
+          src={resolveSrc(sourceUrl)}
           startFrom={Math.round(props.clip.start * fps)}
           endAt={Math.round(props.clip.end * fps)}
           muted
