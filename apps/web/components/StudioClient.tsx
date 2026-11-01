@@ -73,6 +73,8 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [previewCrop, setPreviewCrop] = useState<CropSettings>({ x: 0.5, y: 0.5, zoom: 1 });
+  const [overlayMode, setOverlayMode] = useState<"move" | "pan">("move");
+  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
   const [analysisVersion, setAnalysisVersion] = useState(0);
   const [hasTranscript, setHasTranscript] = useState(false);
   const [transcriptBusy, setTranscriptBusy] = useState(false);
@@ -357,6 +359,27 @@ export default function StudioClient({ jobId }: { jobId: string }) {
     }, 450);
   }
 
+  const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function changeOverlays(next: OverlaySettings[]) {
+    if (!selectedClip) return;
+    const clipId = selectedClip.id;
+    setClips((current) => current.map((clip) => (clip.id === clipId ? { ...clip, overlays: next } : clip)));
+    if (overlayTimer.current) clearTimeout(overlayTimer.current);
+    overlayTimer.current = setTimeout(() => {
+      api<Clip>(`/api/clips/${clipId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ overlays: next }),
+      }).catch((err) => setError(err instanceof Error ? err.message : "Could not save overlays."));
+    }, 300);
+  }
+
+  function handleOverlayChange(id: string, patch: Partial<OverlaySettings>) {
+    if (!selectedClip) return;
+    const current = selectedClip.overlays || [];
+    const next = current.map((o) => (o.id === id ? { ...o, ...patch } : o));
+    changeOverlays(next);
+  }
+
   async function generateTranscript() {
     if (!selectedClip || transcriptBusy) return;
     setTranscriptBusy(true);
@@ -540,6 +563,10 @@ export default function StudioClient({ jobId }: { jobId: string }) {
                     meta={clipMeta}
                     crop={previewCrop}
                     overlays={selectedClip.overlays}
+                    overlayMode={overlayMode}
+                    selectedOverlayId={selectedOverlayId}
+                    onSelectOverlay={setSelectedOverlayId}
+                    onOverlayChange={handleOverlayChange}
                     cropMode={tab === "crop"}
                     onCropChange={changeCrop}
                     analysisVersion={analysisVersion}
@@ -594,6 +621,8 @@ export default function StudioClient({ jobId }: { jobId: string }) {
               patchClip={patchClip}
               crop={previewCrop}
               onCropChange={changeCrop}
+              overlayMode={overlayMode}
+              onOverlayModeChange={setOverlayMode}
               hasTranscript={hasTranscript}
               transcriptBusy={transcriptBusy}
               onGenerateTranscript={generateTranscript}
@@ -706,6 +735,8 @@ function StylePanel({
   patchClip,
   crop,
   onCropChange,
+  overlayMode,
+  onOverlayModeChange,
   hasTranscript,
   transcriptBusy,
   onGenerateTranscript,
@@ -730,6 +761,8 @@ function StylePanel({
   patchClip: (patch: Partial<Clip>, applyAll?: boolean) => Promise<void>;
   crop: CropSettings;
   onCropChange: (crop: CropSettings) => void;
+  overlayMode: "move" | "pan";
+  onOverlayModeChange: (mode: "move" | "pan") => void;
   hasTranscript: boolean;
   transcriptBusy: boolean;
   onGenerateTranscript: () => void;
@@ -887,6 +920,33 @@ function StylePanel({
 
         {tab === "crop" ? (
           <>
+            {clip.video_template === "custom_overlay" ? (
+              <div className="mb-3 flex items-center gap-2">
+                <button
+                  onClick={() => onOverlayModeChange?.("move")}
+                  className={`rounded-lg border px-3 py-1.5 text-[11px] font-medium transition ${
+                    overlayMode === "move"
+                      ? "border-lime/40 bg-lime/10 text-lime"
+                      : "border-white/10 bg-black/20 text-zinc-300 hover:bg-white/5"
+                  }`}
+                >
+                  Move overlay
+                </button>
+                <button
+                  onClick={() => onOverlayModeChange?.("pan")}
+                  className={`rounded-lg border px-3 py-1.5 text-[11px] font-medium transition ${
+                    overlayMode === "pan"
+                      ? "border-lime/40 bg-lime/10 text-lime"
+                      : "border-white/10 bg-black/20 text-zinc-300 hover:bg-white/5"
+                  }`}
+                >
+                  Pan crop
+                </button>
+                <span className="text-[10px] text-zinc-500">
+                  {overlayMode === "move" ? "Drag a box to move it" : "Drag inside a box to pan its crop"}
+                </span>
+              </div>
+            ) : null}
             <CropPanel
               crop={crop}
               onChange={onCropChange}

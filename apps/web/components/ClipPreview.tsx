@@ -34,6 +34,10 @@ type Props = {
   meta?: ClipMeta;
   crop?: CropSettings | null;
   overlays?: OverlaySettings[] | null;
+  overlayMode?: "move" | "pan";
+  selectedOverlayId?: string | null;
+  onSelectOverlay?: (id: string | null) => void;
+  onOverlayChange?: (id: string, patch: Partial<OverlaySettings>) => void;
   cropMode?: boolean;
   onCropChange?: (crop: CropSettings) => void;
   /** Re-fetch the transcript/face track after they are generated on demand. */
@@ -57,6 +61,10 @@ export default function ClipPreview({
   meta,
   crop = null,
   overlays = null,
+  overlayMode = "move",
+  selectedOverlayId = null,
+  onSelectOverlay,
+  onOverlayChange,
   cropMode = false,
   onCropChange,
   analysisVersion = 0,
@@ -67,6 +75,46 @@ export default function ClipPreview({
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef<{ x: number; y: number; crop: CropSettings } | null>(null);
   const activeCrop = useMemo(() => normalizeCrop(crop), [crop]);
+  const layerRef = useRef<HTMLDivElement | null>(null);
+  const overlayDragRef = useRef<{ id: string; startX: number; startY: number; startValue: { x: number; y: number; cropX: number; cropY: number } } | null>(null);
+
+  const beginOverlayDrag = (event: React.PointerEvent<HTMLDivElement>, overlay: OverlaySettings) => {
+    if (!onOverlayChange) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelectOverlay?.(overlay.id ?? null);
+    const rect = layerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch {}
+    overlayDragRef.current = {
+      id: overlay.id ?? "",
+      startX: event.clientX,
+      startY: event.clientY,
+      startValue: { x: overlay.x, y: overlay.y, cropX: overlay.crop.x, cropY: overlay.crop.y },
+    };
+  };
+
+  const moveOverlayDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = overlayDragRef.current;
+    if (!drag || !onOverlayChange || !layerRef.current) return;
+    const rect = layerRef.current.getBoundingClientRect();
+    const dx = (event.clientX - drag.startX) / rect.width;
+    const dy = (event.clientY - drag.startY) / rect.height;
+    const overlay = (overlays || []).find((o) => o.id === drag.id);
+    if (!overlay) return;
+    if (overlayMode === "move") {
+      onOverlayChange(drag.id, { x: Math.min(1, Math.max(0, drag.startValue.x + dx)), y: Math.min(1, Math.max(0, drag.startValue.y + dy)) });
+    } else {
+      const zoom = Math.max(1, overlay.crop.zoom);
+      onOverlayChange(drag.id, { crop: { ...overlay.crop, x: Math.min(1, Math.max(0, drag.startValue.cropX - dx * zoom)), y: Math.min(1, Math.max(0, drag.startValue.cropY - dy * zoom)) } });
+    }
+  };
+
+  const endOverlayDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!overlayDragRef.current) return;
+    overlayDragRef.current = null;
+    try { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); } catch {}
+  };
 
   useEffect(() => {
     let active = true;
@@ -251,6 +299,45 @@ export default function ClipPreview({
             <span className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-medium text-lime">
               Drag to pan · {Math.round(activeCrop.zoom * 100)}%
             </span>
+          </div>
+        ) : null}
+        {cropMode && overlays && overlays.length ? (
+          <div
+            ref={layerRef}
+            className="absolute inset-0 z-20 touch-none"
+            onPointerMove={moveOverlayDrag}
+            onPointerUp={endOverlayDrag}
+            onPointerCancel={endOverlayDrag}
+          >
+            {overlays.map((overlay) => {
+              const selected = selectedOverlayId === overlay.id;
+              const radius =
+                overlay.shape === "circle"
+                  ? "50%"
+                  : overlay.shape === "rounded"
+                  ? "12%"
+                  : "0";
+              return (
+                <div
+                  key={overlay.id}
+                  onPointerDown={(event) => beginOverlayDrag(event, overlay)}
+                  className={`absolute cursor-grab active:cursor-grabbing ${selected ? "ring-2 ring-lime" : "ring-1 ring-white/40"}`}
+                  style={{
+                    left: `${overlay.x * 100}%`,
+                    top: `${overlay.y * 100}%`,
+                    width: `${overlay.size * 100}%`,
+                    aspectRatio: "4 / 3",
+                    transform: "translate(-50%, -50%)",
+                    borderRadius: radius,
+                    background: "rgba(0,0,0,0.25)",
+                  }}
+                >
+                  <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-white drop-shadow">
+                    {overlayMode === "move" ? "move" : "pan"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         ) : null}
       </div>
