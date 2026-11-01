@@ -40,6 +40,13 @@ Rules:
 
 # Niche hints keep the clip picker focused on what actually performs for that
 # channel instead of generic "engaging moments".
+_NICHE_KEYWORDS: dict[str, list[str]] = {
+    "gaming": ["clutch", "insane", "gg", "wtf", "no way", "let's go", "gacor", "buset", "anjir", "menang", "kalah"],
+    "football": ["goal", "gol", "save", "penalti", "kartu", "offside", "var", "menang", "kalah", "gol!"],
+    "podcast": ["hot take", "setuju", "gak setuju", "plot twist", "serius", "jujur", "rahasia", "fakta"],
+    "education": ["tip", "cara", "langkah", "fakta", "mitos", "penting", "perhatikan", "ingat"],
+    "generic": ["wow", "gila", "serius", "penting", "jangan"],
+}
 NICHE_FOCUS: dict[str, str] = {
     "gaming": "Focus on clutch plays, jumpscares, rage moments, funny fails and reaction peaks. Badges look like CLUTCH, JUMPSCARE, INSANE, GG.",
     "football": "Focus on goals, saves, fouls, referee controversy, crowd reactions and commentary peaks. Badges look like GOL, PENALTI, KARTU MERAH, SAVE.",
@@ -215,6 +222,8 @@ def heuristic_clips(
     from ..templates import NICHE_BY_ID
 
     badge = (NICHE_BY_ID.get((niche or "generic").lower()) or NICHE_BY_ID["generic"])["badges"][0]
+    niche_key = (niche or "generic").lower()
+    keywords = _NICHE_KEYWORDS.get(niche_key, _NICHE_KEYWORDS["generic"])
     segments = transcript.get("segments") or []
     if not segments:
         segments = [{"start": 0, "end": duration, "text": "Video segment"}]
@@ -231,7 +240,9 @@ def heuristic_clips(
         if length >= 12 and text:
             punctuation = len(re.findall(r"[!?]", text))
             density = len(text.split()) / max(1.0, length)
-            score = min(1.0, 0.45 + punctuation * 0.08 + density * 0.25)
+            lowered = text.lower()
+            kw_hits = sum(lowered.count(kw) for kw in keywords)
+            score = min(1.0, 0.45 + punctuation * 0.08 + density * 0.25 + min(0.2, kw_hits * 0.05))
             title_words = re.sub(r"\s+", " ", text).strip().split()[:9]
             title = " ".join(title_words).strip(" ,.-") or "Highlight"
             windows.append(

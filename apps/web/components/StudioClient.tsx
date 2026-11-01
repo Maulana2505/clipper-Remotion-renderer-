@@ -1361,6 +1361,11 @@ function ClipCard({
       </div>
       <div className="p-3">
         <div className="truncate text-xs font-semibold text-white">{clip.title || "Untitled clip"}</div>
+        {clip.reason ? (
+          <div className="mt-0.5 truncate text-[10px] text-zinc-400" title={clip.reason}>
+            {clip.reason}
+          </div>
+        ) : null}
         <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-500">
           <span>{canvas?.name || "9:16"}</span>
           <span>{Math.round(clip.score * 100)} score</span>

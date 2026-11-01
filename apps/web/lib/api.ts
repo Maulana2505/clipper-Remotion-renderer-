@@ -64,6 +64,8 @@ export interface Clip {
   is_hot: boolean;
   hook?: string | null;
   title?: string | null;
+  reason?: string | null;
+  signals?: Record<string, unknown> | null;
   hashtags: string[];
   canvas: string;
   video_template: string;

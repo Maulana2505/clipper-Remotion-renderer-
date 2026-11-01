@@ -105,6 +105,8 @@ MIGRATIONS: list[tuple[str, str, str]] = [
     ("clips", "badge", "TEXT"),
     ("clips", "accent", "TEXT"),
     ("clips", "meta_json", "TEXT"),
+    ("clips", "reason", "TEXT"),
+    ("clips", "signals_json", "TEXT"),
     ("renders", "engine", "TEXT"),
     ("renders", "duration_ms", "INTEGER"),
 ]
@@ -185,6 +187,15 @@ def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
                 data["overlays"] = []
         else:
             data["overlays"] = []
+    if "signals_json" in data:
+        raw = data["signals_json"]
+        if isinstance(raw, str) and raw.strip():
+            try:
+                data["signals"] = json.loads(raw)
+            except json.JSONDecodeError:
+                data["signals"] = None
+        else:
+            data["signals"] = None
     return data
 
 

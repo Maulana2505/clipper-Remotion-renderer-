@@ -93,6 +93,66 @@ def _new_windows(
     return chosen
 
 
+def _fuse_with_audio(
+    transcript_windows: list[dict], audio_windows: list[dict], duration: float
+) -> list[dict]:
+    """Merge transcript-derived windows with audio/visual moment windows."""
+    result: list[dict] = []
+    for w in transcript_windows:
+        item = dict(w)
+        item.setdefault("reason", item.get("reason") or "Transcript moment")
+        item.setdefault("hook", item.get("hook") or "")
+        item.setdefault("title", item.get("title") or "Clip")
+        item.setdefault("badge", item.get("badge"))
+        item.setdefault("hashtags", item.get("hashtags") or ["#shorts", "#clip"])
+        item["signals_json"] = item.get("signals_json")
+        result.append(item)
+
+    # Boost transcript windows that land on an audio peak.
+    for tw in result:
+        mid = (float(tw["start"]) + float(tw["end"])) / 2.0
+        nearest = None
+        best = 1e9
+        for aw in audio_windows:
+            am = (float(aw["start"]) + float(aw["end"])) / 2.0
+            if abs(am - mid) < best:
+                best = abs(am - mid)
+                nearest = aw
+        if nearest is not None and best <= 6.0:
+            tw["score"] = min(1.0, float(tw.get("score") or 0.7) + 0.08)
+            if "audio peak" not in (tw.get("reason") or ""):
+                tw["reason"] = f"{tw.get('reason')} + audio peak".strip(" +")
+
+    # Add audio-only windows that do not overlap any transcript window.
+    for aw in audio_windows:
+        am_s, am_e = float(aw["start"]), float(aw["end"])
+        if any(min(am_e, float(tw["end"])) - max(am_s, float(tw["start"])) > 1.0 for tw in result):
+            continue
+        item = dict(aw)
+        item.setdefault("hook", "")
+        item.setdefault("title", item.get("title") or "Clip")
+        item.setdefault("badge", item.get("badge"))
+        item.setdefault("hashtags", item.get("hashtags") or ["#shorts", "#clip"])
+        item["score"] = min(0.9, float(item.get("score") or 0.5) * 0.85)
+        item["reason"] = item.get("reason") or "Audio moment"
+        if "transcript" not in (item["reason"] or "").lower():
+            item["reason"] = f"{item['reason']} (audio)"
+        signals = item.pop("signals", None)
+        if signals is not None and not item.get("signals_json"):
+            item["signals_json"] = __import__("json").dumps(signals, ensure_ascii=False)
+        result.append(item)
+
+    # Dedup overlaps keeping higher score.
+    result.sort(key=lambda c: float(c.get("score") or 0), reverse=True)
+    kept: list[dict] = []
+    for c in result:
+        if any(min(float(c["end"]), float(k["end"])) - max(float(c["start"]), float(k["start"])) > 1.0 for k in kept):
+            continue
+        kept.append(c)
+    kept.sort(key=lambda c: float(c["start"]))
+    return kept
+
+
 def redetect_clips(job_id: str, mode: str = "merge") -> dict:
     mode = "replace" if mode == "replace" else "merge"
     _write_state(job_id, status="running", mode=mode, added=0, skipped=0, source=None, error="")
@@ -116,6 +176,27 @@ def redetect_clips(job_id: str, mode: str = "merge") -> dict:
         detected, source = detect_clips(transcript, duration, job.get("niche"))
         if not detected:
             raise RuntimeError("No clips were found in the transcript.")
+
+        # Fuse with audio/visual moments from the source so transcript picks
+        # are anchored to real energy peaks and audio-only highlights survive.
+        try:
+            from .moments import detect_moments
+            from pathlib import Path
+
+            source_path = job.get("video_path")
+            audio_result = None
+            if source_path and Path(source_path).exists():
+                audio_result = detect_moments(
+                    Path(source_path), duration, job.get("niche"),
+                    max_clips=20, visual=True,
+                )
+            audio_windows = (audio_result or {}).get("clips") or []
+        except Exception as exc:  # noqa: BLE001
+            print(f"[redetect] audio fusion skipped: {exc}")
+            audio_windows = []
+        if audio_windows:
+            detected = _fuse_with_audio(detected, audio_windows, duration)
+            source = f"{source}+audio"
 
         with get_conn() as conn:
             channel = load_channel(conn, job.get("channel_id"))

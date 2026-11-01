@@ -77,13 +77,19 @@ def insert_clips(
     for index, clip in enumerate(clips, start=1):
         clip_id = uuid.uuid4().hex
         clip_ids.append(clip_id)
+        signals_json = clip.get("signals_json")
+        if signals_json is None and clip.get("signals") is not None:
+            try:
+                signals_json = json.dumps(clip.get("signals"), ensure_ascii=False)
+            except (TypeError, ValueError):
+                signals_json = None
         conn.execute(
             """
             INSERT INTO clips (
                 id, job_id, start_time, end_time, score, is_hot, hook, title, hashtags,
                 canvas, video_template, caption_template, caption_enabled, font_preset,
-                badge, accent, meta_json, face_track_path, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                badge, accent, meta_json, reason, signals_json, face_track_path, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 clip_id,
@@ -103,6 +109,8 @@ def insert_clips(
                 clip.get("badge") or default_badge,
                 preset["accent"],
                 meta_json,
+                clip.get("reason") or "",
+                signals_json,
                 None,
                 now_iso(),
             ),
