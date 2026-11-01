@@ -57,6 +57,10 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [clips, setClips] = useState<Clip[]>([]);
   const [canvases, setCanvases] = useState<CanvasPreset[]>([]);
   const [videoTemplates, setVideoTemplates] = useState<TemplateItem[]>([]);
+  const [showAllTemplates, setShowAllTemplates] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("clipper.showAllTemplates") === "1";
+  });
   const [captionTemplates, setCaptionTemplates] = useState<TemplateItem[]>([]);
   const [fonts, setFonts] = useState<FontPreset[]>([]);
   const [niches, setNiches] = useState<NichePreset[]>([]);
@@ -218,13 +222,11 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   useEffect(() => {
     Promise.all([
       api<CanvasPreset[]>("/api/canvas-presets"),
-      api<TemplateItem[]>("/api/video-templates"),
       api<TemplateItem[]>("/api/caption-templates"),
       api<FontPreset[]>("/api/font-presets"),
     ])
-      .then(([canvasData, videoData, captionData, fontData]) => {
+      .then(([canvasData, captionData, fontData]) => {
         setCanvases(canvasData);
-        setVideoTemplates(videoData);
         setCaptionTemplates(captionData);
         setFonts(fontData);
       })
@@ -232,6 +234,18 @@ export default function StudioClient({ jobId }: { jobId: string }) {
     api<NichePreset[]>("/api/niches").then(setNiches).catch(() => undefined);
     api<Channel[]>("/api/channels").then(setChannels).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    const url = `/api/video-templates${showAllTemplates ? "?include_hidden=true" : ""}`;
+    api<TemplateItem[]>(url)
+      .then((data) => {
+        setVideoTemplates(data);
+      })
+      .catch(() => undefined);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("clipper.showAllTemplates", showAllTemplates ? "1" : "0");
+    }
+  }, [showAllTemplates]);
 
   useEffect(() => {
     let active = true;
@@ -589,6 +603,8 @@ export default function StudioClient({ jobId }: { jobId: string }) {
               redetectBusy={redetectBusy}
               redetectMode={redetectMode}
               onRedetect={redetect}
+              showAllTemplates={showAllTemplates}
+              onToggleAllTemplates={setShowAllTemplates}
             />
           </section>
 
@@ -699,6 +715,8 @@ function StylePanel({
   redetectBusy,
   redetectMode,
   onRedetect,
+  showAllTemplates,
+  onToggleAllTemplates,
 }: {
   tab: StyleTab;
   setTab: (tab: StyleTab) => void;
@@ -721,6 +739,8 @@ function StylePanel({
   redetectBusy: boolean;
   redetectMode: "merge" | "replace";
   onRedetect: (mode: "merge" | "replace") => void;
+  showAllTemplates: boolean;
+  onToggleAllTemplates: (value: boolean) => void;
 }) {
   const NICHE_ORDER = ["gaming", "football", "podcast", "education", "generic", "other"];
   const NICHE_LABEL: Record<string, string> = {
@@ -801,6 +821,15 @@ function StylePanel({
       <div className="mt-4 max-h-[520px] space-y-2 overflow-y-auto pr-1">
         {tab === "video" ? (
           <div className="space-y-4">
+            <label className="flex items-center gap-2 text-[10px] text-zinc-500">
+              <input
+                type="checkbox"
+                checked={showAllTemplates}
+                onChange={(event) => onToggleAllTemplates(event.target.checked)}
+                className="accent-lime"
+              />
+              Tampilkan semua template
+            </label>
             {groupedVideoTemplates.map((group) => (
               <div key={group.key} className="space-y-2">
                 <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between rounded-lg bg-panel/95 px-1 py-1 backdrop-blur">
@@ -822,9 +851,6 @@ function StylePanel({
                 </div>
               </div>
             ))}
-            {clip.video_template === "custom_overlay" ? (
-              <OverlaysEditor overlays={clip.overlays || []} onChange={(next) => patchClip({ overlays: next })} />
-            ) : null}
           </div>
         ) : null}
 
@@ -860,13 +886,20 @@ function StylePanel({
         ) : null}
 
         {tab === "crop" ? (
-          <CropPanel
-            crop={crop}
-            onChange={onCropChange}
-            faceBusy={faceBusy}
-            faceReady={faceReady}
-            onGenerateFaceTrack={onGenerateFaceTrack}
-          />
+          <>
+            <CropPanel
+              crop={crop}
+              onChange={onCropChange}
+              faceBusy={faceBusy}
+              faceReady={faceReady}
+              onGenerateFaceTrack={onGenerateFaceTrack}
+            />
+            {clip.video_template === "custom_overlay" ? (
+              <div className="mt-3">
+                <OverlaysEditor overlays={clip.overlays || []} onChange={(next) => patchClip({ overlays: next })} />
+              </div>
+            ) : null}
+          </>
         ) : null}
 
         {tab === "caption" ? (

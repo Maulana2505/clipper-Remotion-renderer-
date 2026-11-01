@@ -262,3 +262,17 @@ NICHE_PRESETS: list[dict] = [
 ]
 
 NICHE_BY_ID = {item["id"]: item for item in NICHE_PRESETS}
+
+# Templates hidden from the picker by default. Niche-specific layouts are kept
+# for existing jobs but hidden so the UI focuses on the general ones while
+# experimenting. Set INCLUDE_HIDDEN_TEMPLATES=1 (or pass include_hidden=true
+# to /api/video-templates) to reveal them.
+HIDDEN_TEMPLATE_IDS: set[str] = {
+    t["id"] for t in VIDEO_TEMPLATES if t.get("niche") not in (None, "", "generic")
+}
+
+
+def visible_video_templates(include_hidden: bool = False) -> list[dict]:
+    if include_hidden:
+        return VIDEO_TEMPLATES
+    return [t for t in VIDEO_TEMPLATES if t["id"] not in HIDDEN_TEMPLATE_IDS]

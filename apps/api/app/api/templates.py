@@ -25,8 +25,10 @@ def canvas_presets():
 
 
 @router.get("/video-templates")
-def video_templates():
-    return VIDEO_TEMPLATES
+def video_templates(include_hidden: bool = False):
+    from ..templates import visible_video_templates
+
+    return visible_video_templates(include_hidden)
 
 
 @router.get("/caption-templates")
