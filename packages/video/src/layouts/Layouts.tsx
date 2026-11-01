@@ -194,96 +194,13 @@ const GamingHud: React.FC<LayoutProps> = ({props, time}) => {
   );
 };
 
-const scoreText = (meta: ClipMeta | undefined): string => {
-  const home = meta?.score?.home ?? 0;
-  const away = meta?.score?.away ?? 0;
-  return `${home} - ${away}`;
-};
-
 const FootballScoreboard: React.FC<LayoutProps> = ({props}) => {
   const {canvas, caption, meta} = props;
-  const width = Math.round(canvas.width * 0.88);
-  const fontSize = Math.round(Math.min(canvas.width, canvas.height) * 0.05);
-  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
-  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
-  const competition = meta?.competition?.toUpperCase();
-  const minute = meta?.minute;
-
   return (
     <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <TopScrim strength={0.45} />
-      <div
-        style={{
-          position: 'absolute',
-          top: Math.round(canvas.height * 0.05),
-          left: Math.round((canvas.width - width) / 2),
-          width,
-          borderRadius: Math.round(fontSize * 0.28),
-          overflow: 'hidden',
-          boxShadow: '0 18px 44px rgba(0,0,0,0.55)',
-          fontFamily: fontFamilyOf('archivo_black'),
-        }}
-      >
-        {competition ? (
-          <div
-            style={{
-              background: caption.accent,
-              color: '#0b0b0b',
-              fontSize: Math.round(fontSize * 0.42),
-              letterSpacing: '0.14em',
-              textAlign: 'center',
-              padding: `${Math.round(fontSize * 0.14)}px 0`,
-            }}
-          >
-            {competition}
-          </div>
-        ) : null}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: Math.round(fontSize * 0.3),
-            background: 'rgba(8,9,11,0.86)',
-            padding: `${Math.round(fontSize * 0.34)}px ${Math.round(fontSize * 0.55)}px`,
-          }}
-        >
-          <div style={{flex: 1, color: '#fff', fontSize, textAlign: 'left'}}>{home}</div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: Math.round(fontSize * 0.25),
-            }}
-          >
-            <div style={{color: '#fff', fontSize: Math.round(fontSize * 1.25), letterSpacing: '0.02em'}}>
-              {scoreText(meta)}
-            </div>
-            {minute ? (
-              <div
-                style={{
-                  background: caption.accent,
-                  color: '#0b0b0b',
-                  fontSize: Math.round(fontSize * 0.5),
-                  padding: `${Math.round(fontSize * 0.1)}px ${Math.round(fontSize * 0.28)}px`,
-                  borderRadius: 999,
-                }}
-              >
-                {minute}
-              </div>
-            ) : null}
-          </div>
-          <div style={{flex: 1, color: '#fff', fontSize, textAlign: 'right'}}>{away}</div>
-        </div>
-      </div>
-      <Badge
-        text={meta?.badge}
-        accent={caption.accent}
-        canvas={canvas}
-        top={Math.round(canvas.height * 0.185)}
-        align="center"
-      />
+      <TopScrim strength={0.35} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
       <ProgressBar accent={caption.accent} canvas={canvas} />
     </>
   );
@@ -626,12 +543,16 @@ const GamingHudTop: React.FC<LayoutProps> = ({props, time}) => {
 
 const GamingMinimal: React.FC<LayoutProps> = ({props}) => {
   const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.06);
   return (
     <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', inset: margin, border: `1px solid ${caption.accent}44`, borderRadius: Math.round(canvas.width * 0.04), boxShadow: `0 0 24px ${caption.accent}22`, pointerEvents: 'none'}} />
       <TopScrim strength={0.35} />
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
-      <ProgressBar accent={caption.accent} canvas={canvas} />
+      <div style={{position: 'absolute', top: margin * 1.4, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.width * 0.045), fontWeight: 800, color: '#fff', textShadow: `0 0 14px ${caption.accent}`}}>
+        {meta?.badge ?? 'CLIP'}
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
     </>
   );
 };
@@ -688,30 +609,122 @@ const GamingSplit: React.FC<LayoutProps> = ({props, time}) => {
   );
 };
 
+// ---------- Gaming modern variants ----------
+
+const GamingGlass: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.05);
+  const bubble = Math.round(canvas.width * 0.26);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', inset: margin, borderRadius: Math.round(canvas.width * 0.05), border: `1px solid ${caption.accent}55`, boxShadow: `0 0 40px ${caption.accent}22, inset 0 0 40px ${caption.accent}11`, pointerEvents: 'none'}} />
+      <div style={{position: 'absolute', top: margin, left: margin, right: margin, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: margin}}>
+        <div style={{background: 'rgba(8,9,11,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: `1px solid ${caption.accent}44`, borderRadius: 999, padding: `${Math.round(margin * 0.35)}px ${Math.round(margin * 0.7)}px`, color: '#fff', fontSize: Math.round(canvas.width * 0.032), fontFamily: fontFamilyOf('inter'), letterSpacing: '0.08em'}}>
+          {meta?.badge ?? 'CLIP'}
+        </div>
+        <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.22} zoom={3.2} top={margin} left={canvas.width - bubble - margin} />
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
+    </>
+  );
+};
+
+const GamingEsports: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.04);
+  const barH = Math.round(canvas.height * 0.09);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: barH, background: `linear-gradient(90deg, ${caption.accent}33, rgba(8,9,11,0.92) 40%, rgba(8,9,11,0.92) 60%, ${caption.accent}33)`, borderBottom: `2px solid ${caption.accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: fontFamilyOf('archivo_black')}}>
+        <div style={{color: '#fff', fontSize: Math.round(barH * 0.5), letterSpacing: '0.18em'}}>{meta?.badge ?? 'HIGHLIGHT'}</div>
+      </div>
+      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.24} zoom={3.6} top={barH + margin} left={margin} />
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.007} />
+    </>
+  );
+};
+
+const GamingStream: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.04);
+  const bubble = Math.round(canvas.width * 0.24);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim strength={0.5} />
+      <div style={{position: 'absolute', bottom: margin, left: margin, width: bubble, height: Math.round(bubble * 0.75), borderRadius: Math.round(bubble * 0.12), overflow: 'hidden', border: `2px solid ${caption.accent}`, boxShadow: `0 12px 32px rgba(0,0,0,0.6), 0 0 18px ${caption.accent}44`}}>
+        <FocusMedia props={props} focus={focusAt(props, time)} zoom={2.6} width={bubble} height={Math.round(bubble * 0.75)} style={{position: 'absolute', inset: 0}} />
+      </div>
+      <div style={{position: 'absolute', bottom: margin, left: margin + bubble + margin * 0.6, right: margin, background: 'rgba(8,9,11,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: `1px solid ${caption.accent}33`, borderRadius: Math.round(canvas.width * 0.03), padding: `${Math.round(margin * 0.5)}px ${Math.round(margin * 0.7)}px`}}>
+        <div style={{color: caption.accent, fontSize: Math.round(canvas.width * 0.03), fontFamily: fontFamilyOf('inter'), fontWeight: 700, letterSpacing: '0.06em'}}>{meta?.badge ?? 'LIVE'}</div>
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.005} />
+    </>
+  );
+};
+
+const GamingMinimalNeon: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const margin = Math.round(canvas.width * 0.06);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', inset: margin, border: `2px solid ${caption.accent}`, borderRadius: Math.round(canvas.width * 0.04), boxShadow: `0 0 30px ${caption.accent}55, inset 0 0 20px ${caption.accent}22`, pointerEvents: 'none'}} />
+      <div style={{position: 'absolute', top: margin * 1.4, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.width * 0.045), fontWeight: 800, color: '#fff', textShadow: `0 0 16px ${caption.accent}`}}>
+        {meta?.badge ?? 'CLIP'}
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.008} />
+    </>
+  );
+};
+
+const GamingCinematic: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, caption, meta} = props;
+  const bar = Math.round(canvas.height * 0.12);
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: bar, background: 'linear-gradient(180deg, rgba(0,0,0,0.85), transparent)'}} />
+      <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, height: bar, background: 'linear-gradient(0deg, rgba(0,0,0,0.85), transparent)'}} />
+      <div style={{position: 'absolute', top: bar * 0.35, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black'), fontSize: Math.round(canvas.width * 0.07), color: '#fff', letterSpacing: '0.12em', textShadow: `0 0 24px ${caption.accent}`}}>
+        {meta?.badge ?? 'HIGHLIGHT'}
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
+    </>
+  );
+};
+
+const GamingVerticalStack: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const half = Math.round(canvas.height * 0.5);
+  const face = focusAt(props, time);
+  return (
+    <>
+      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: half, overflow: 'hidden'}}>
+        <MainMedia props={props} style={{objectFit: 'cover'}} />
+      </div>
+      <div style={{position: 'absolute', top: half, left: 0, right: 0, height: canvas.height - half, overflow: 'hidden', background: '#05060a'}}>
+        <FocusMedia props={props} focus={face} zoom={2.4} width={canvas.width} height={canvas.height - half} style={{position: 'absolute', inset: 0}} />
+      </div>
+      <div style={{position: 'absolute', top: half - 2, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, transparent, ${caption.accent}, transparent)`, boxShadow: `0 0 18px ${caption.accent}`}} />
+      <div style={{position: 'absolute', top: half * 0.08, left: canvas.width * 0.06, fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.width * 0.04), fontWeight: 800, color: '#fff', textShadow: `0 0 12px ${caption.accent}`}}>
+        {meta?.badge ?? 'CLIP'}
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
+    </>
+  );
+};
+
 // ---------- Football variants ----------
 
 const FootballScoreboardBottom: React.FC<LayoutProps> = ({props}) => {
   const {canvas, caption, meta} = props;
-  const width = Math.round(canvas.width * 0.88);
-  const fontSize = Math.round(Math.min(canvas.width, canvas.height) * 0.05);
-  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
-  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
-  const competition = meta?.competition?.toUpperCase();
-  const minute = meta?.minute;
   return (
     <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', bottom: Math.round(canvas.height * 0.12), left: Math.round((canvas.width - width) / 2), width, borderRadius: Math.round(fontSize * 0.28), overflow: 'hidden', boxShadow: '0 18px 44px rgba(0,0,0,0.55)', fontFamily: fontFamilyOf('archivo_black')}}>
-        {competition ? (<div style={{background: caption.accent, color: '#0b0b0b', fontSize: Math.round(fontSize * 0.42), letterSpacing: '0.14em', textAlign: 'center', padding: `${Math.round(fontSize * 0.14)}px 0`}}>{competition}</div>) : null}
-        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: Math.round(fontSize * 0.3), background: 'rgba(8,9,11,0.86)', padding: `${Math.round(fontSize * 0.34)}px ${Math.round(fontSize * 0.55)}px`}}>
-          <div style={{flex: 1, color: '#fff', fontSize, textAlign: 'left'}}>{home}</div>
-          <div style={{display: 'flex', alignItems: 'center', gap: Math.round(fontSize * 0.25)}}>
-            <div style={{color: '#fff', fontSize: Math.round(fontSize * 1.25)}}>{scoreText(meta)}</div>
-            {minute ? (<div style={{background: caption.accent, color: '#0b0b0b', fontSize: Math.round(fontSize * 0.5), padding: `${Math.round(fontSize * 0.1)}px ${Math.round(fontSize * 0.28)}px`, borderRadius: 999}}>{minute}</div>) : null}
-          </div>
-          <div style={{flex: 1, color: '#fff', fontSize, textAlign: 'right'}}>{away}</div>
-        </div>
-      </div>
+      <TopScrim strength={0.3} />
       <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
       <ProgressBar accent={caption.accent} canvas={canvas} />
     </>
@@ -720,13 +733,11 @@ const FootballScoreboardBottom: React.FC<LayoutProps> = ({props}) => {
 
 const FootballMinimal: React.FC<LayoutProps> = ({props}) => {
   const {canvas, caption, meta} = props;
-  const fontSize = Math.round(Math.min(canvas.width, canvas.height) * 0.09);
   return (
     <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
       <TopScrim strength={0.4} />
-      <div style={{position: 'absolute', top: canvas.height * 0.06, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black'), fontSize, color: '#fff', textShadow: '0 6px 24px rgba(0,0,0,0.9)'}}>{scoreText(meta)}</div>
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.16} align="center" />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" scale={1.2} />
       <ProgressBar accent={caption.accent} canvas={canvas} />
     </>
   );
@@ -734,23 +745,11 @@ const FootballMinimal: React.FC<LayoutProps> = ({props}) => {
 
 const FootballBroadcast: React.FC<LayoutProps> = ({props}) => {
   const {canvas, caption, meta} = props;
-  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
-  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
-  const competition = meta?.competition?.toUpperCase();
-  const minute = meta?.minute;
-  const barH = Math.round(canvas.height * 0.11);
   return (
     <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: barH, background: 'rgba(8,9,11,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${Math.round(canvas.width * 0.05)}px`, fontFamily: fontFamilyOf('archivo_black')}}>
-        <div style={{color: '#fff', fontSize: Math.round(barH * 0.45), flex: 1, textAlign: 'left'}}>{home}</div>
-        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2}}>
-          <div style={{color: caption.accent, fontSize: Math.round(barH * 0.6), letterSpacing: '0.05em'}}>{scoreText(meta)}</div>
-          {competition ? (<div style={{color: '#aaa', fontSize: Math.round(barH * 0.22), letterSpacing: '0.12em'}}>{competition}{minute ? ` · ${minute}` : ''}</div>) : null}
-        </div>
-        <div style={{color: '#fff', fontSize: Math.round(barH * 0.45), flex: 1, textAlign: 'right'}}>{away}</div>
-      </div>
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={barH + canvas.height * 0.04} align="center" />
+      <TopScrim strength={0.35} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
       <ProgressBar accent={caption.accent} canvas={canvas} />
     </>
   );
@@ -758,18 +757,11 @@ const FootballBroadcast: React.FC<LayoutProps> = ({props}) => {
 
 const FootballHighlight: React.FC<LayoutProps> = ({props}) => {
   const {canvas, caption, meta} = props;
-  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
-  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
   return (
     <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
       <TopScrim strength={0.6} />
       <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" scale={1.3} />
-      <div style={{position: 'absolute', top: canvas.height * 0.22, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black')}}>
-        <div style={{color: '#fff', fontSize: Math.round(canvas.height * 0.05), letterSpacing: '0.08em'}}>{home} vs {away}</div>
-        <div style={{color: caption.accent, fontSize: Math.round(canvas.height * 0.13), marginTop: canvas.height * 0.02}}>{scoreText(meta)}</div>
-        {meta?.minute ? (<div style={{color: '#fff', fontSize: Math.round(canvas.height * 0.04), marginTop: canvas.height * 0.01}}>{meta.minute}</div>) : null}
-      </div>
       <ProgressBar accent={caption.accent} canvas={canvas} />
     </>
   );
@@ -777,15 +769,11 @@ const FootballHighlight: React.FC<LayoutProps> = ({props}) => {
 
 const FootballClean: React.FC<LayoutProps> = ({props}) => {
   const {canvas, caption, meta} = props;
-  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
-  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
   return (
     <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', top: canvas.height * 0.06, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black'), fontSize: Math.round(canvas.height * 0.05), color: '#fff', textShadow: '0 4px 18px rgba(0,0,0,0.8)'}}>
-        {home} <span style={{color: caption.accent}}>{scoreText(meta)}</span> {away}
-      </div>
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.13} align="center" />
+      <TopScrim strength={0.3} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.06} align="center" />
       <ProgressBar accent={caption.accent} canvas={canvas} />
     </>
   );
@@ -793,22 +781,11 @@ const FootballClean: React.FC<LayoutProps> = ({props}) => {
 
 const FootballVerticalStack: React.FC<LayoutProps> = ({props}) => {
   const {canvas, caption, meta} = props;
-  const home = (meta?.teams?.home ?? 'HOME').toUpperCase();
-  const away = (meta?.teams?.away ?? 'AWAY').toUpperCase();
-  const fs = Math.round(canvas.height * 0.06);
   return (
     <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <TopScrim strength={0.5} />
-      <div style={{position: 'absolute', top: canvas.height * 0.06, left: canvas.width * 0.06, fontFamily: fontFamilyOf('archivo_black'), fontSize: fs, color: '#fff', textAlign: 'left', lineHeight: 1.1}}>
-        <div>{home}</div>
-        <div style={{color: caption.accent, fontSize: fs * 1.4}}>{meta?.score?.home ?? 0}</div>
-      </div>
-      <div style={{position: 'absolute', bottom: canvas.height * 0.16, right: canvas.width * 0.06, fontFamily: fontFamilyOf('archivo_black'), fontSize: fs, color: '#fff', textAlign: 'right', lineHeight: 1.1}}>
-        <div>{away}</div>
-        <div style={{color: caption.accent, fontSize: fs * 1.4}}>{meta?.score?.away ?? 0}</div>
-      </div>
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.45} align="center" />
+      <TopScrim strength={0.4} />
+      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.45} align="center" scale={1.2} />
       <ProgressBar accent={caption.accent} canvas={canvas} />
     </>
   );
@@ -1071,6 +1048,18 @@ export const ClipLayout: React.FC<LayoutProps> = ({props, time}) => {
       return <GamingReaction props={props} time={time} />;
     case 'gaming_split':
       return <GamingSplit props={props} time={time} />;
+    case 'gaming_glass':
+      return <GamingGlass props={props} time={time} />;
+    case 'gaming_esports':
+      return <GamingEsports props={props} time={time} />;
+    case 'gaming_stream':
+      return <GamingStream props={props} time={time} />;
+    case 'gaming_minimal_neon':
+      return <GamingMinimalNeon props={props} time={time} />;
+    case 'gaming_cinematic':
+      return <GamingCinematic props={props} time={time} />;
+    case 'gaming_vertical_stack':
+      return <GamingVerticalStack props={props} time={time} />;
     case 'football_scoreboard':
       return <FootballScoreboard props={props} time={time} />;
     case 'football_scoreboard_bottom':
