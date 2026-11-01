@@ -71,6 +71,8 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [analysisVersion, setAnalysisVersion] = useState(0);
   const [hasTranscript, setHasTranscript] = useState(false);
   const [transcriptBusy, setTranscriptBusy] = useState(false);
+  const [redetectBusy, setRedetectBusy] = useState(false);
+  const [redetectMode, setRedetectMode] = useState<"merge" | "replace">("merge");
   const [faceBusy, setFaceBusy] = useState(false);
   const [faceReady, setFaceReady] = useState(false);
   const clipsLoaded = useRef(false);
@@ -170,6 +172,49 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   }, [faceBusy, selectedClip?.id]);
 
   useEffect(() => {
+    if (!redetectBusy) return;
+    let attempts = 0;
+    const timer = setInterval(async () => {
+      attempts += 1;
+      if (attempts > 150) {
+        setRedetectBusy(false);
+        setError("Re-detection timed out. Check the API log.");
+        return;
+      }
+      try {
+        const status = await api<{
+          status: "idle" | "running" | "done" | "error";
+          mode: "merge" | "replace";
+          added: number;
+          skipped: number;
+          source?: string | null;
+          error?: string;
+        }>(`/api/jobs/${jobId}/redetect`);
+        if (status.status === "running") return;
+        setRedetectBusy(false);
+        if (status.status === "idle") return;
+        if (status.status === "error") {
+          setError(status.error || "Re-detection failed.");
+          return;
+        }
+        await refreshJob();
+        const skipped = status.skipped ? `, ${status.skipped} skipped` : "";
+        const suffix = status.source ? ` (${status.source})` : "";
+        setNotice(
+          `${status.added} clip${status.added === 1 ? "" : "s"} ${
+            status.mode === "replace" ? "replaced" : "added"
+          }${skipped}${suffix}.`,
+        );
+        setTimeout(() => setNotice(null), 3200);
+      } catch {
+        // still running
+      }
+    }, 2000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [redetectBusy, jobId]);
+
+  useEffect(() => {
     Promise.all([
       api<CanvasPreset[]>("/api/canvas-presets"),
       api<TemplateItem[]>("/api/video-templates"),
@@ -248,7 +293,10 @@ export default function StudioClient({ jobId }: { jobId: string }) {
         const clipData = await api<Clip[]>(`/api/jobs/${jobId}/clips`);
         setClips(clipData);
         clipsLoaded.current = true;
-        if (clipData.length && !selectedId) setSelectedId(clipData[0].id);
+        const current = selectedIdRef.current;
+        if (clipData.length && (!current || !clipData.some((clip) => clip.id === current))) {
+          setSelectedId(clipData[0].id);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Refresh failed.");
@@ -316,6 +364,23 @@ export default function StudioClient({ jobId }: { jobId: string }) {
     } catch (err) {
       setFaceBusy(false);
       setError(err instanceof Error ? err.message : "Could not start face tracking.");
+    }
+  }
+
+  async function redetect(mode: "merge" | "replace") {
+    if (!hasTranscript || redetectBusy) return;
+    setRedetectMode(mode);
+    setRedetectBusy(true);
+    setError(null);
+    setNotice(mode === "merge" ? "Adding clips from the transcript…" : "Rebuilding clips from the transcript…");
+    try {
+      await api(`/api/jobs/${jobId}/redetect`, {
+        method: "POST",
+        body: JSON.stringify({ mode }),
+      });
+    } catch (err) {
+      setRedetectBusy(false);
+      setError(err instanceof Error ? err.message : "Could not re-detect clips.");
     }
   }
 
@@ -519,6 +584,9 @@ export default function StudioClient({ jobId }: { jobId: string }) {
               faceBusy={faceBusy}
               faceReady={faceReady}
               onGenerateFaceTrack={generateFaceTrack}
+              redetectBusy={redetectBusy}
+              redetectMode={redetectMode}
+              onRedetect={redetect}
             />
           </section>
 
@@ -626,6 +694,9 @@ function StylePanel({
   faceBusy,
   faceReady,
   onGenerateFaceTrack,
+  redetectBusy,
+  redetectMode,
+  onRedetect,
 }: {
   tab: StyleTab;
   setTab: (tab: StyleTab) => void;
@@ -645,7 +716,11 @@ function StylePanel({
   faceBusy: boolean;
   faceReady: boolean;
   onGenerateFaceTrack: () => void;
+  redetectBusy: boolean;
+  redetectMode: "merge" | "replace";
+  onRedetect: (mode: "merge" | "replace") => void;
 }) {
+  const [confirmReplace, setConfirmReplace] = useState(false);
   if (!clip) return null;
   return (
     <aside className="h-fit rounded-2xl border border-white/10 bg-panel p-4 xl:sticky xl:top-20">
@@ -769,6 +844,62 @@ function StylePanel({
                 </button>
               </div>
             ) : null}
+            <div className="mb-2 rounded-xl border border-white/10 bg-black/20 p-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-white">
+                <Wand2 size={13} className="text-lime" />
+                Re-detect from transcript
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                Uses the transcript above. <span className="text-zinc-300">Add</span> keeps existing clips and their
+                crop/badge edits; <span className="text-zinc-300">Replace</span> rebuilds the whole list.
+              </p>
+              {!hasTranscript ? (
+                <p className="mt-2 rounded-lg border border-white/5 bg-black/20 px-2 py-1.5 text-[10px] text-zinc-500">
+                  Generate a transcript first.
+                </p>
+              ) : confirmReplace ? (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setConfirmReplace(false);
+                      onRedetect("replace");
+                    }}
+                    disabled={redetectBusy}
+                    className="rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-[11px] font-semibold text-red-200 hover:bg-red-400/15 disabled:opacity-50"
+                  >
+                    Yes, replace all
+                  </button>
+                  <button
+                    onClick={() => setConfirmReplace(false)}
+                    className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] font-medium text-zinc-300 hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => onRedetect("merge")}
+                    disabled={redetectBusy || transcriptBusy}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-lime/25 bg-lime/10 px-3 py-2 text-[11px] font-semibold text-lime hover:bg-lime/15 disabled:opacity-50"
+                  >
+                    {redetectBusy && redetectMode === "merge" ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Wand2 size={12} />
+                    )}
+                    {redetectBusy && redetectMode === "merge" ? "Re-detecting…" : "Add clips"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmReplace(true)}
+                    disabled={redetectBusy || transcriptBusy}
+                    className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] font-medium text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+                  >
+                    Replace all
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="mb-2 flex items-center justify-between rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
               <div>
                 <div className="text-xs font-medium text-white">Captions</div>

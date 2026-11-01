@@ -15,7 +15,7 @@ Local-first web app that turns long videos into short, captioned, platform-ready
 - Automatic range import for videos longer than 30 minutes (`yt-dlp --download-sections` for URLs, FFmpeg trim for uploads); gaming processes the full VOD by default
 - Fast job pipeline: download → audio scan → highlight detection → clip build (no transcription, no face tracking)
 - Manual crop on every clip: pan/zoom (`x`, `y`, `zoom`) shared by preview and render
-- On-demand extras while editing: generate a transcript (for captions) or a face track per clip
+- On-demand extras while editing: generate a transcript (for captions), re-detect clips from that transcript, or track a face per clip
 - Channel profiles: store layout, caption style, font, accent and language once per niche, reuse on every job
 - 4 niche presets (gaming, football, podcast/reaction, education) plus a generic fallback
 - Per-job football scoreboard data (teams, score, minute, competition)
@@ -97,6 +97,7 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 4. In the Studio you can:
    - open the **Crop** tab to pan/zoom every clip (drag inside the preview, or use the sliders); the crop is stored per clip and used by both preview and render
    - press **Generate transcript** in the Caption tab if you want captions (runs `faster-whisper` locally, on demand)
+   - after a transcript exists, **Add clips** re-detects moments from the transcript and appends only non-overlapping windows, while **Replace all** rebuilds the clip list (both use the configured LLM, or the local heuristic when no key is set)
    - press **Auto-detect face** in the Crop tab if a layout's face bubble/PiP should follow a face (OpenCV, on demand)
 5. Rendering runs Remotion:
    - FFmpeg extracts the clip's audio and a full-frame JPEG sequence of the clip window

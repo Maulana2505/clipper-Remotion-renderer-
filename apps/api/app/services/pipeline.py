@@ -27,14 +27,14 @@ def _job_dir(job_id: str) -> Path:
     return path
 
 
-def _load_channel(conn, channel_id: str | None) -> dict | None:
+def load_channel(conn, channel_id: str | None) -> dict | None:
     if not channel_id:
         return None
     row = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
     return dict(row) if row else None
 
 
-def _resolve_preset(job: dict, channel: dict | None) -> dict:
+def resolve_preset(job: dict, channel: dict | None) -> dict:
     """Niche default, overridden by the channel profile. Clip edits win later."""
     niche = (channel or {}).get("niche") or job.get("niche") or "generic"
     preset = dict(NICHE_BY_ID.get(niche) or NICHE_BY_ID["generic"])
@@ -48,7 +48,7 @@ def _resolve_preset(job: dict, channel: dict | None) -> dict:
     return preset
 
 
-def _clip_meta(job: dict, channel: dict | None) -> dict:
+def clip_meta(job: dict, channel: dict | None) -> dict:
     meta: dict = {}
     raw = job.get("meta_json")
     if raw:
@@ -59,6 +59,58 @@ def _clip_meta(job: dict, channel: dict | None) -> dict:
     if channel and channel.get("language") and not meta.get("language"):
         meta["language"] = channel["language"]
     return {key: value for key, value in meta.items() if value not in (None, "", [], {})}
+
+
+def insert_clips(
+    conn,
+    job_id: str,
+    clips: list[dict],
+    preset: dict,
+    *,
+    meta_json: str | None = None,
+    default_badge: str | None = None,
+    on_insert=None,
+) -> list[str]:
+    """Persist detected windows as clips. Shared by the build and re-detect."""
+    total = len(clips)
+    clip_ids: list[str] = []
+    for index, clip in enumerate(clips, start=1):
+        clip_id = uuid.uuid4().hex
+        clip_ids.append(clip_id)
+        conn.execute(
+            """
+            INSERT INTO clips (
+                id, job_id, start_time, end_time, score, is_hot, hook, title, hashtags,
+                canvas, video_template, caption_template, caption_enabled, font_preset,
+                badge, accent, meta_json, face_track_path, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                clip_id,
+                job_id,
+                clip["start"],
+                clip["end"],
+                clip["score"],
+                1 if clip.get("is_hot") else 0,
+                clip.get("hook") or "",
+                clip.get("title") or f"Clip {index}",
+                json.dumps(clip.get("hashtags") or []),
+                preset["canvas"],
+                preset["video_template"],
+                preset["caption_template"],
+                1 if preset.get("caption_enabled", True) else 0,
+                preset["font_preset"],
+                clip.get("badge") or default_badge,
+                preset["accent"],
+                meta_json,
+                None,
+                now_iso(),
+            ),
+        )
+        conn.commit()
+        if on_insert is not None:
+            on_insert(index, total)
+    return clip_ids
 
 
 def _trim_source(source: Path, start: float, end: float, job_dir: Path) -> Path:
@@ -86,8 +138,8 @@ def process_job(job_id: str) -> None:
         job = dict(row)
         job_dir = _job_dir(job_id)
         source = Path(job.get("video_path") or job_dir / "source.mp4")
-        channel = _load_channel(conn, job.get("channel_id"))
-        preset = _resolve_preset(job, channel)
+        channel = load_channel(conn, job.get("channel_id"))
+        preset = resolve_preset(job, channel)
 
         raw_start = job.get("source_start")
         raw_end = job.get("source_end")
@@ -155,49 +207,25 @@ def process_job(job_id: str) -> None:
         conn.execute("DELETE FROM clips WHERE job_id = ?", (job_id,))
         conn.commit()
 
-        meta = _clip_meta(job, channel)
+        meta = clip_meta(job, channel)
         meta_json = json.dumps(meta, ensure_ascii=False) if meta else None
         default_badge = (preset.get("badges") or [None])[0]
 
+        insert_clips(
+            conn,
+            job_id,
+            clips,
+            preset,
+            meta_json=meta_json,
+            default_badge=default_badge,
+            on_insert=lambda index, total: update_job(
+                conn,
+                job_id,
+                stage="clips",
+                progress=min(98, 70 + int((index / max(1, total)) * 28)),
+            ),
+        )
         total = len(clips)
-        clip_ids: list[str] = []
-        for index, clip in enumerate(clips, start=1):
-            clip_id = uuid.uuid4().hex
-            clip_ids.append(clip_id)
-
-            conn.execute(
-                """
-                INSERT INTO clips (
-                    id, job_id, start_time, end_time, score, is_hot, hook, title, hashtags,
-                    canvas, video_template, caption_template, caption_enabled, font_preset,
-                    badge, accent, meta_json, face_track_path, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    clip_id,
-                    job_id,
-                    clip["start"],
-                    clip["end"],
-                    clip["score"],
-                    1 if clip.get("is_hot") else 0,
-                    clip.get("hook") or "",
-                    clip.get("title") or f"Clip {index}",
-                    json.dumps(clip.get("hashtags") or []),
-                    preset["canvas"],
-                    preset["video_template"],
-                    preset["caption_template"],
-                    1 if preset.get("caption_enabled", True) else 0,
-                    preset["font_preset"],
-                    clip.get("badge") or default_badge,
-                    preset["accent"],
-                    meta_json,
-                    None,
-                    now_iso(),
-                ),
-            )
-            conn.commit()
-            progress = 70 + int((index / max(1, total)) * 28)
-            update_job(conn, job_id, stage="clips", progress=min(98, progress))
 
         update_job(
             conn,

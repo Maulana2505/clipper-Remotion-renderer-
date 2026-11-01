@@ -11,9 +11,11 @@ from fastapi.responses import FileResponse
 
 from ..core.config import JOBS_DIR
 from ..db import get_conn, now_iso, row_to_dict
-from ..schemas import JobCreate
+from ..schemas import JobCreate, RedetectRequest
 from ..services.media import MediaError, ensure_disk_space, extract_audio, is_safe_url, probe_url_duration
 from ..services.pipeline import process_job
+from ..services.redetect import is_running as is_redetect_running
+from ..services.redetect import redetect_clips, redetect_status
 from ..services.transcribe import fallback_transcript, transcribe_audio, transcribe_from_vtt
 from ..templates import NICHE_BY_ID
 
@@ -269,6 +271,34 @@ def generate_job_transcript(job_id: str, force: bool = False):
         _TRANSCRIPT_RUNNING.add(job_id)
     threading.Thread(target=_run_transcript, args=(job_id,), daemon=True).start()
     return {"status": "running"}
+
+
+@router.post("/{job_id}/redetect")
+def redetect_job_clips(job_id: str, payload: RedetectRequest):
+    """Transcript-aware re-detection. Runs in the background; poll the GET."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT transcript_path FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    if not row["transcript_path"] or not Path(row["transcript_path"]).exists():
+        raise HTTPException(
+            status_code=409, detail="Generate a transcript before re-detecting clips."
+        )
+    if is_redetect_running(job_id):
+        return {"status": "running", "mode": payload.mode}
+    threading.Thread(
+        target=redetect_clips, args=(job_id, payload.mode), daemon=True
+    ).start()
+    return {"status": "running", "mode": payload.mode}
+
+
+@router.get("/{job_id}/redetect")
+def get_redetect_status(job_id: str):
+    with get_conn() as conn:
+        row = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return redetect_status(job_id)
 
 
 @router.get("/{job_id}/video")

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -36,6 +38,12 @@ class CropSettings(BaseModel):
     x: float = Field(default=0.5, ge=0.0, le=1.0)
     y: float = Field(default=0.5, ge=0.0, le=1.0)
     zoom: float = Field(default=1.0, ge=1.0, le=4.0)
+
+
+class RedetectRequest(BaseModel):
+    """How to apply transcript-aware clip detection to an existing job."""
+
+    mode: Literal["merge", "replace"] = "merge"
 
 
 class ChannelCreate(BaseModel):
