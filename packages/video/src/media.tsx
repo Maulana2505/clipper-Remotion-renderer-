@@ -249,15 +249,16 @@ export const OverlayBubble: React.FC<{
   const framePrefix = overlay.framePrefix;
 
   const coverScale = Math.max(width / props.source.width, height / props.source.height);
-  const totalZoom = Math.max(1, crop.zoom);
-  const displayWidth = props.source.width * coverScale * totalZoom;
-  const displayHeight = props.source.height * coverScale * totalZoom;
+  const baseWidth = Math.round(props.source.width * coverScale);
+  const baseHeight = Math.round(props.source.height * coverScale);
   const inner: React.CSSProperties = {
     position: 'absolute',
-    left: Math.min(0, Math.max(width - displayWidth, -(crop.x * displayWidth - width / 2))),
-    top: Math.min(0, Math.max(height - displayHeight, -(crop.y * displayHeight - height / 2))),
-    width: displayWidth,
-    height: displayHeight,
+    width: baseWidth,
+    height: baseHeight,
+    left: Math.round((width - baseWidth) / 2),
+    top: Math.round((height - baseHeight) / 2),
+    ...cropTransform(overlay.crop),
+    transformOrigin: '50% 50%',
   };
 
   return (

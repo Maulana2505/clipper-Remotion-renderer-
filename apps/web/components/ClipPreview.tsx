@@ -106,7 +106,7 @@ export default function ClipPreview({
       onOverlayChange(drag.id, { x: Math.min(1, Math.max(0, drag.startValue.x + dx)), y: Math.min(1, Math.max(0, drag.startValue.y + dy)) });
     } else {
       const zoom = Math.max(1, overlay.crop.zoom);
-      onOverlayChange(drag.id, { crop: { ...overlay.crop, x: Math.min(1, Math.max(0, drag.startValue.cropX - dx * zoom)), y: Math.min(1, Math.max(0, drag.startValue.cropY - dy * zoom)) } });
+      onOverlayChange(drag.id, { crop: { ...overlay.crop, x: Math.min(1, Math.max(0, drag.startValue.cropX - dx / zoom)), y: Math.min(1, Math.max(0, drag.startValue.cropY - dy / zoom)) } });
     }
   };
 
