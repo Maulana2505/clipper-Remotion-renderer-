@@ -920,7 +920,7 @@ function StylePanel({
 
         {tab === "crop" ? (
           <>
-            {clip.video_template === "custom_overlay" ? (
+            {clip.overlays && clip.overlays.length ? (
               <div className="mb-3 flex items-center gap-2">
                 <button
                   onClick={() => onOverlayModeChange?.("move")}
@@ -954,11 +954,9 @@ function StylePanel({
               faceReady={faceReady}
               onGenerateFaceTrack={onGenerateFaceTrack}
             />
-            {clip.video_template === "custom_overlay" ? (
-              <div className="mt-3">
-                <OverlaysEditor overlays={clip.overlays || []} onChange={(next) => patchClip({ overlays: next })} />
-              </div>
-            ) : null}
+            <div className="mt-3">
+              <OverlaysEditor overlays={clip.overlays || []} onChange={(next) => patchClip({ overlays: next })} />
+            </div>
           </>
         ) : null}
 

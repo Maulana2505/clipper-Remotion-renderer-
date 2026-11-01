@@ -3,6 +3,7 @@ import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {ClipProps} from './types';
 import {CaptionLayer} from './captions/CaptionLayer';
 import {ClipLayout} from './layouts/Layouts';
+import {OverlayBubble} from './media';
 
 /**
  * Single composition used by both the in-app preview (`@remotion/player`)
@@ -17,6 +18,9 @@ export const ClipComposition: React.FC<ClipProps> = (props) => {
   return (
     <AbsoluteFill style={{backgroundColor: '#08090b', overflow: 'hidden'}}>
       <ClipLayout props={props} time={time} />
+      {(props.overlays || []).map((overlay) => (
+        <OverlayBubble key={overlay.id || `${overlay.x}-${overlay.y}`} props={props} overlay={overlay} />
+      ))}
       <CaptionLayer
         words={props.words}
         template={props.caption.template}

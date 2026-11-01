@@ -113,6 +113,9 @@ def _extract_frames_loop(source: Path, frame_count: int, out_dir: Path, prefix: 
     if produced == 0:
         raise MediaError("Frame extraction produced no frames.")
     return produced
+
+
+def _extract_audio(source: Path, start: float, end: float, destination: Path) -> bool:
     duration = max(0.1, end - start)
     cmd = [
         FFMPEG,
