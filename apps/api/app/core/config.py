@@ -40,6 +40,10 @@ JOB_TIMEOUT_SECONDS = int(os.getenv("JOB_TIMEOUT_SECONDS", "0"))  # 0 = derive f
 RENDER_TIMEOUT_SECONDS = int(os.getenv("RENDER_TIMEOUT_SECONDS", str(15 * 60)))
 MAX_CLIPS = int(os.getenv("MAX_CLIPS", "20"))
 
+FACE_SAMPLE_SECONDS = float(os.getenv("FACE_SAMPLE_SECONDS", "0.4"))
+FACE_MAX_WIDTH = int(os.getenv("FACE_MAX_WIDTH", "480"))
+FACE_MODEL_PATH = os.getenv("FACE_MODEL_PATH", "").strip()
+
 ALLOWED_URL_HOSTS = {
     "youtube.com",
     "www.youtube.com",
