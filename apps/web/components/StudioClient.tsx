@@ -720,6 +720,30 @@ function StylePanel({
   redetectMode: "merge" | "replace";
   onRedetect: (mode: "merge" | "replace") => void;
 }) {
+  const NICHE_ORDER = ["gaming", "football", "podcast", "education", "generic", "other"];
+  const NICHE_LABEL: Record<string, string> = {
+    gaming: "Gaming",
+    football: "Football",
+    podcast: "Podcast / Reaction",
+    education: "Education",
+    generic: "General",
+    other: "Other",
+  };
+  const groupedVideoTemplates = useMemo(() => {
+    const groups = new Map<string, TemplateItem[]>();
+    for (const template of videoTemplates) {
+      const key = (template.niche || "generic").toLowerCase();
+      const bucket = NICHE_ORDER.includes(key) ? key : "other";
+      if (!groups.has(bucket)) groups.set(bucket, []);
+      groups.get(bucket)!.push(template);
+    }
+    return NICHE_ORDER.filter((key) => groups.has(key)).map((key) => ({
+      key,
+      label: NICHE_LABEL[key],
+      templates: groups.get(key)!,
+    }));
+  }, [videoTemplates]);
+
   const [confirmReplace, setConfirmReplace] = useState(false);
   if (!clip) return null;
   return (
@@ -774,15 +798,29 @@ function StylePanel({
 
       <div className="mt-4 max-h-[520px] space-y-2 overflow-y-auto pr-1">
         {tab === "video" ? (
-          videoTemplates.map((template) => (
-            <TemplateButton
-              key={template.id}
-              active={clip.video_template === template.id}
-              title={template.name}
-              description={template.description}
-              onClick={() => patchClip({ video_template: template.id })}
-            />
-          ))
+          <div className="space-y-4">
+            {groupedVideoTemplates.map((group) => (
+              <div key={group.key} className="space-y-2">
+                <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between rounded-lg bg-panel/95 px-1 py-1 backdrop-blur">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                    {group.label}
+                  </span>
+                  <span className="text-[10px] tabular-nums text-zinc-600">{group.templates.length}</span>
+                </div>
+                <div className="space-y-1.5">
+                  {group.templates.map((template) => (
+                    <TemplateButton
+                      key={template.id}
+                      active={clip.video_template === template.id}
+                      title={template.name}
+                      description={template.description}
+                      onClick={() => patchClip({ video_template: template.id })}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : null}
 
         {tab === "canvas" ? (
