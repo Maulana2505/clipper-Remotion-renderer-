@@ -397,7 +397,7 @@ export default function ImportPage() {
                         This video is {formatTimecode(videoDuration)} long.{" "}
                         {activeNiche === "gaming"
                           ? "Gaming processes the full video by default; set a window only if you want a shorter import."
-                          : "Pick a window so the download and transcription stay manageable."}
+                          : "Pick a window so the download and clip scan stay manageable."}
                       </p>
                     ) : null}
                     <div className="grid grid-cols-2 gap-2">
@@ -443,10 +443,10 @@ export default function ImportPage() {
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { icon: Scissors, title: "Hook detection", text: "Transcript-aware clip picking with LLM or local heuristic." },
-          { icon: ScanFace, title: "Smart re-frame", text: "Face tracking keeps the speaker in frame across canvases." },
-          { icon: Captions, title: "Caption styles", text: "Glow, box, karaoke, typewriter, and more." },
-          { icon: Film, title: "Niche layouts", text: "Gaming HUD, football scoreboard, duo split, lower third." },
+          { icon: Scissors, title: "Highlight scan", text: "Audio-energy highlight picking, no transcription needed." },
+          { icon: ScanFace, title: "Manual crop", text: "Pan and zoom every clip; optional face tracking on demand." },
+          { icon: Captions, title: "Caption styles", text: "Glow, box, karaoke, typewriter — transcript on demand." },
+          { icon: Film, title: "Niche layouts", text: "40 layouts: gaming HUD, football scoreboard, podcast, education." },
         ].map((item) => (
           <div key={item.title} className="rounded-2xl border border-white/10 bg-panel/70 p-4">
             <item.icon size={18} className="text-lime" />

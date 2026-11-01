@@ -4,7 +4,7 @@ Local-first web app that turns long videos into short, captioned, platform-ready
 
 - **Frontend:** Next.js 16 + React 19 + Tailwind + Remotion Player preview
 - **API:** FastAPI + SQLite
-- **Media prep:** `yt-dlp`, FFmpeg, optional `faster-whisper`, optional OpenCV face tracking
+- **Media prep:** `yt-dlp`, FFmpeg, optional `faster-whisper` and OpenCV face tracking (both on demand only)
 - **Rendering:** Remotion only — the preview and the final file use the same React composition (`packages/video`)
 - **Fonts:** open-source fonts bundled locally (no Google Fonts request at runtime)
 - **No cloud rendering, no AWS Lambda, no auth, no watermark** — personal use, localhost
@@ -12,16 +12,17 @@ Local-first web app that turns long videos into short, captioned, platform-ready
 ## What is implemented
 
 - Import page for URL or local upload
-- Automatic range import for videos longer than 30 minutes (`yt-dlp --download-sections` for URLs, FFmpeg trim for uploads)
-- Job pipeline: download → audio → transcribe → hook detection → face tracking
+- Automatic range import for videos longer than 30 minutes (`yt-dlp --download-sections` for URLs, FFmpeg trim for uploads); gaming processes the full VOD by default
+- Fast job pipeline: download → audio scan → highlight detection → clip build (no transcription, no face tracking)
+- Manual crop on every clip: pan/zoom (`x`, `y`, `zoom`) shared by preview and render
+- On-demand extras while editing: generate a transcript (for captions) or a face track per clip
 - Channel profiles: store layout, caption style, font, accent and language once per niche, reuse on every job
 - 4 niche presets (gaming, football, podcast/reaction, education) plus a generic fallback
 - Per-job football scoreboard data (teams, score, minute, competition)
-- LLM-generated moment badges (CLUTCH, GOL, HOT TAKE, …), editable per clip
+- Editable moment badges, with niche defaults (and LLM suggestions once a transcript exists)
 - LLM settings drawer with encrypted API key storage
 - LLM providers: OpenAI-compatible (OpenAI, DeepSeek, custom) and Gemini
-- Fallback heuristic clip detection when no LLM key is configured
-- 14 video layouts, including `gaming_hud`, `football_scoreboard`, `duo_split` and `lower_third`
+- 40 video layouts across all niches
 - 14 caption templates + `none` to disable captions
 - 8 canvases at 1080p
 - Per-clip canvas, layout, caption style, font, accent, badge and metadata
@@ -47,8 +48,10 @@ The start script checks for the virtualenv and `node_modules`, and warns if a po
 - Python 3.12+
 - FFmpeg + FFprobe on `PATH`
 - yt-dlp on `PATH`
-- Optional: `faster-whisper` for local speech-to-text
-- Optional: `opencv-python-headless` for face tracking
+- Optional: `faster-whisper` for local speech-to-text (only used when you press *Generate transcript*)
+- Optional: `opencv-python-headless` for face tracking (only used when you press *Auto-detect face*)
+
+> Both extras are off by default. The build pipeline never transcribes or tracks faces, so a job finishes after the audio scan.
 
 > `faster-whisper` is optional but needs `requests` and `av==12.3.0` (newer PyAV builds break it). The first transcription downloads the `small` model (~460 MB) to `%USERPROFILE%\.cache\huggingface\hub`. On Windows without Developer Mode, Hugging Face prints a harmless symlink warning.
 
@@ -89,17 +92,15 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 ## How it works
 
 1. Pick a channel (or a niche) and paste a supported URL or upload a video.
-2. The API downloads/extracts audio and tries:
-   - `faster-whisper`, if installed
-   - yt-dlp subtitles, if available
-   - a fixed-window fallback transcript
-3. Hook detection uses the configured LLM with a niche-specific prompt. Without an API key, a local heuristic picks clips.
-4. Face tracking uses OpenCV Haar cascades when available; otherwise center crop.
-5. Each clip inherits: niche default → channel profile → per-clip edits.
-6. The studio lets you choose layout, canvas, caption style, font, accent, badge, football scoreboard data, and title/hashtags.
-7. Rendering runs Remotion:
+2. The API downloads the video and runs an FFmpeg loudness scan (RMS every 500 ms). The busiest non-overlapping windows become the candidate clips — no Whisper, no face tracking, no model download.
+3. Each clip gets the niche/channel defaults: layout, canvas, captions, font, accent, and a default moment badge. Titles and badges stay editable.
+4. In the Studio you can:
+   - open the **Crop** tab to pan/zoom every clip (drag inside the preview, or use the sliders); the crop is stored per clip and used by both preview and render
+   - press **Generate transcript** in the Caption tab if you want captions (runs `faster-whisper` locally, on demand)
+   - press **Auto-detect face** in the Crop tab if a layout's face bubble/PiP should follow a face (OpenCV, on demand)
+5. Rendering runs Remotion:
    - FFmpeg extracts the clip's audio and a full-frame JPEG sequence of the clip window
-   - Remotion renders `<Img>` + vector text at the canvas resolution (frames are not pre-cropped; layout cropping stays in React)
+   - Remotion renders `<Img>` + vector text at the canvas resolution (frames are not pre-cropped; crop and layout stay in React)
    - FFmpeg muxes the audio back (`-c:v copy -c:a aac`)
    - Renders run one at a time behind a lock; failures surface the error and can be retried
 

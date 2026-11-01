@@ -12,6 +12,15 @@ export type Word = {word: string; start: number; end: number};
 
 export type FaceKeyframe = {t: number; x: number; y: number};
 
+/** Manual pan/zoom of the cover-fitted source frame. */
+export type CropSettings = {
+  /** Normalised point that sits in the middle of the output. */
+  x: number;
+  y: number;
+  /** 1 = plain cover fit, 4 = maximum zoom. */
+  zoom: number;
+};
+
 export type LayoutId =
   // Legacy templates
   | 'auto_crop'
@@ -121,6 +130,7 @@ export type ClipProps = {
   source: {url: string; width: number; height: number};
   media?: MediaSpec;
   layout: LayoutId;
+  crop?: CropSettings;
   caption: {template: CaptionId; font: FontId; accent: string; enabled: boolean};
   words: Word[];
   face?: {keyframes: FaceKeyframe[]};

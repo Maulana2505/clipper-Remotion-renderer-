@@ -3,7 +3,7 @@ import {spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {ClipMeta, ClipProps, CanvasSpec} from '../types';
 import {safeAreaOf} from '../types';
 import {fontFamilyOf} from '../fonts';
-import {FocusMedia, MainMedia, faceAt} from '../media';
+import {FocusMedia, MainMedia, focusAt} from '../media';
 
 type LayoutProps = {
   props: ClipProps;
@@ -141,7 +141,7 @@ const FaceBubble: React.FC<{
   const {canvas} = props;
   const width = Math.round(canvas.width * sizeScale);
   const height = Math.round(width * 0.75);
-  const face = faceAt(props.face?.keyframes, time);
+  const face = focusAt(props, time);
   return (
     <FocusMedia
       props={props}
@@ -431,7 +431,7 @@ const LegacyLayout: React.FC<LayoutProps> = ({props, time}) => {
   const {canvas, layout, meta, caption} = props;
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const face = faceAt(props.face?.keyframes, time);
+  const face = focusAt(props, time);
   const objectPosition = `${face.x * 100}% ${face.y * 100}%`;
   const titleTop = canvas.height * 0.06;
 
@@ -661,7 +661,7 @@ const GamingReaction: React.FC<LayoutProps> = ({props, time}) => {
       <TopScrim />
       <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.42} zoom={2.6} top={margin} left={margin} />
       <div style={{position: 'absolute', bottom: margin, right: margin, width: small, height: Math.round(small * 0.75), borderRadius: small * 0.08, overflow: 'hidden', border: `3px solid ${caption.accent}`, boxShadow: '0 12px 30px rgba(0,0,0,0.5)'}}>
-        <FocusMedia props={props} focus={faceAt(props.face?.keyframes, time)} zoom={1.4} width={small} height={Math.round(small * 0.75)} style={{position: 'absolute', inset: 0}} />
+        <FocusMedia props={props} focus={focusAt(props, time)} zoom={1.4} width={small} height={Math.round(small * 0.75)} style={{position: 'absolute', inset: 0}} />
       </div>
       <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin + big * 0.05} right={margin} />
       <ProgressBar accent={caption.accent} canvas={canvas} />
@@ -672,7 +672,7 @@ const GamingReaction: React.FC<LayoutProps> = ({props, time}) => {
 const GamingSplit: React.FC<LayoutProps> = ({props, time}) => {
   const {canvas, caption, meta} = props;
   const half = Math.round(canvas.height * 0.5);
-  const face = faceAt(props.face?.keyframes, time);
+  const face = focusAt(props, time);
   return (
     <>
       <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: half, overflow: 'hidden'}}>
@@ -819,7 +819,7 @@ const FootballVerticalStack: React.FC<LayoutProps> = ({props}) => {
 const DuoSplitHorizontal: React.FC<LayoutProps> = ({props, time}) => {
   const {canvas, caption, meta} = props;
   const half = Math.round(canvas.width * 0.5);
-  const face = faceAt(props.face?.keyframes, time);
+  const face = focusAt(props, time);
   return (
     <>
       <div style={{position: 'absolute', top: 0, left: 0, width: half, height: canvas.height, overflow: 'hidden'}}>
@@ -996,7 +996,7 @@ const EducationSplit: React.FC<LayoutProps> = ({props}) => {
 
 const CenterFocus: React.FC<LayoutProps> = ({props, time}) => {
   const {canvas, caption, meta} = props;
-  const face = faceAt(props.face?.keyframes, time);
+  const face = focusAt(props, time);
   const size = Math.round(canvas.width * 0.5);
   return (
     <>

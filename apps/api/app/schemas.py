@@ -26,6 +26,18 @@ class JobCreate(BaseModel):
     meta: JobMeta | None = None
 
 
+class CropSettings(BaseModel):
+    """Manual pan/zoom crop of the cover-fitted frame.
+
+    ``x``/``y`` is the normalised point that should sit in the middle of the
+    output, ``zoom`` is how far the frame is scaled in (1 = plain cover fit).
+    """
+
+    x: float = Field(default=0.5, ge=0.0, le=1.0)
+    y: float = Field(default=0.5, ge=0.0, le=1.0)
+    zoom: float = Field(default=1.0, ge=1.0, le=4.0)
+
+
 class ChannelCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     niche: str = "generic"
@@ -63,6 +75,7 @@ class ClipPatch(BaseModel):
     accent: str | None = None
     badge: str | None = None
     meta: JobMeta | None = None
+    crop: CropSettings | None = None
 
 
 class RenderRequest(BaseModel):

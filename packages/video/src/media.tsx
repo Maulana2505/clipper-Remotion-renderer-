@@ -1,6 +1,8 @@
 import React from 'react';
 import {Img, Video, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import type {ClipProps, FaceKeyframe} from './types';
+import type {ClipProps, CropSettings, FaceKeyframe} from './types';
+
+const MAX_ZOOM = 4;
 
 export function resolveSrc(url: string): string {
   if (/^(https?:|data:|blob:)/i.test(url)) {
@@ -11,6 +13,51 @@ export function resolveSrc(url: string): string {
 
 function frameSrc(prefix: string, frame: number, extension = '.jpg', digits = 4): string {
   return staticFile(`${prefix}${String(frame + 1).padStart(digits, '0')}${extension}`);
+}
+
+/** How far the frame can be panned at a given zoom without exposing an edge. */
+export function cropRoom(zoom: number): number {
+  const safe = Math.max(1, Math.min(MAX_ZOOM, zoom || 1));
+  return (safe - 1) / (2 * safe);
+}
+
+export function normalizeCrop(crop?: Partial<CropSettings> | null): CropSettings {
+  const rawZoom = Number(crop?.zoom ?? 1);
+  const zoom = Math.max(1, Math.min(MAX_ZOOM, Number.isFinite(rawZoom) ? rawZoom : 1));
+  const room = cropRoom(zoom);
+  const clamp = (value: number) => {
+    const safe = Number.isFinite(value) ? value : 0.5;
+    return Math.min(0.5 + room, Math.max(0.5 - room, safe));
+  };
+  return {
+    x: clamp(Number(crop?.x ?? 0.5)),
+    y: clamp(Number(crop?.y ?? 0.5)),
+    zoom,
+  };
+}
+
+/** CSS transform that centres the crop point and keeps the frame edge-to-edge. */
+export function cropTransform(crop?: Partial<CropSettings> | null): React.CSSProperties {
+  const normalized = normalizeCrop(crop);
+  if (normalized.zoom <= 1.0001) {
+    return {};
+  }
+  const tx = (0.5 - normalized.x) * 100;
+  const ty = (0.5 - normalized.y) * 100;
+  return {
+    transform: `scale(${normalized.zoom}) translate(${tx.toFixed(3)}%, ${ty.toFixed(3)}%)`,
+    transformOrigin: '50% 50%',
+  };
+}
+
+/** Focus point for layout bubbles: tracked face when available, else the crop. */
+export function focusAt(props: ClipProps, time: number): {x: number; y: number} {
+  const keyframes = props.face?.keyframes;
+  if (keyframes && keyframes.length > 0) {
+    return faceAt(keyframes, time);
+  }
+  const crop = normalizeCrop(props.crop);
+  return {x: crop.x, y: crop.y};
 }
 
 export function useIsFramesMode(props: ClipProps): boolean {
@@ -56,24 +103,30 @@ export const MainMedia: React.FC<{
   const {fps} = useVideoConfig();
   const framesMode = useIsFramesMode(props);
   const frames = props.media?.frames;
-
-  if (framesMode && frames) {
-    return (
-      <Img
-        src={frameSrc(frames.mainPrefix, frame, frames.extension, frames.digits)}
-        style={{position: 'absolute', inset: 0, width: '100%', height: '100%', ...style}}
-      />
-    );
-  }
+  const crop = cropTransform(props.crop);
+  const inner: React.CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    ...style,
+    ...crop,
+  };
 
   return (
-    <Video
-      src={resolveSrc(props.source.url)}
-      startFrom={Math.round(props.clip.start * fps)}
-      endAt={Math.round(props.clip.end * fps)}
-      muted={muted}
-      style={{position: 'absolute', inset: 0, width: '100%', height: '100%', ...style}}
-    />
+    <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
+      {framesMode && frames ? (
+        <Img src={frameSrc(frames.mainPrefix, frame, frames.extension, frames.digits)} style={inner} />
+      ) : (
+        <Video
+          src={resolveSrc(props.source.url)}
+          startFrom={Math.round(props.clip.start * fps)}
+          endAt={Math.round(props.clip.end * fps)}
+          muted={muted}
+          style={inner}
+        />
+      )}
+    </div>
   );
 };
 
@@ -96,6 +149,11 @@ export const FocusMedia: React.FC<{
   const {fps} = useVideoConfig();
   const frames = props.media?.frames;
   const framesMode = useIsFramesMode(props);
+  const crop = normalizeCrop(props.crop);
+  // The bubble already zooms in, so only follow a little of the manual crop
+  // zoom. Otherwise a 180% crop turns the bubble into a tiny patch of skin.
+  const cropBoost = 1 + (crop.zoom - 1) * 0.4;
+  const totalZoom = Math.max(1, zoom * cropBoost);
 
   const shell: React.CSSProperties = {
     position: 'relative',
@@ -119,8 +177,8 @@ export const FocusMedia: React.FC<{
 
   // Cover-fit the source inside the bubble, then zoom around the focus point.
   const coverScale = Math.max(width / props.source.width, height / props.source.height);
-  const displayWidth = props.source.width * coverScale * zoom;
-  const displayHeight = props.source.height * coverScale * zoom;
+  const displayWidth = props.source.width * coverScale * totalZoom;
+  const displayHeight = props.source.height * coverScale * totalZoom;
   const left = Math.min(0, Math.max(width - displayWidth, -(focus.x * displayWidth - width / 2)));
   const top = Math.min(0, Math.max(height - displayHeight, -(focus.y * displayHeight - height / 2)));
 

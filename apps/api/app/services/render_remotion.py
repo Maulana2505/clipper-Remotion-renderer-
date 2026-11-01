@@ -230,6 +230,7 @@ def build_props(
         },
         "media": {"mode": "frames", "frames": {"mainPrefix": frames_prefix}},
         "layout": clip.get("video_template") or "auto_crop",
+        "crop": clip.get("crop") or {"x": 0.5, "y": 0.5, "zoom": 1.0},
         "caption": {
             "enabled": bool(clip.get("caption_enabled", 1)),
             "template": clip.get("caption_template") or "plain_white",

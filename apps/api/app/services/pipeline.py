@@ -7,19 +7,16 @@ from pathlib import Path
 from ..core.config import FFMPEG, JOBS_DIR
 from ..db import get_conn, now_iso, update_job
 from ..templates import NICHE_BY_ID
-from .face import track_faces
-from .llm import detect_clips
+from .highlights import detect_clips_from_audio
 from .media import (
     MediaError,
     download_video,
     ensure_disk_space,
-    extract_audio,
     fetch_video_title,
     probe_media,
     run,
     try_download_subtitles,
 )
-from .transcribe import fallback_transcript, transcribe_audio, transcribe_from_vtt
 
 PRESET_FIELDS = ("canvas", "video_template", "caption_template", "font_preset", "accent")
 
@@ -147,21 +144,10 @@ def process_job(job_id: str) -> None:
             height=int(probe.get("height") or 0),
         )
 
-        audio_path = extract_audio(source, job_dir / "audio.wav")
-        update_job(conn, job_id, stage="transcribe", progress=38, audio_path=str(audio_path))
-
-        transcript = transcribe_audio(audio_path, duration)
-        if transcript is None:
-            vtts = sorted(job_dir.glob("subs*.vtt"))
-            transcript = transcribe_from_vtt(vtts[0], duration) if vtts else None
-        if transcript is None:
-            transcript = fallback_transcript(duration)
-
-        transcript_path = job_dir / "transcript.json"
-        transcript_path.write_text(json.dumps(transcript, ensure_ascii=False, indent=2), encoding="utf-8")
-        update_job(conn, job_id, stage="detect", progress=62, transcript_path=str(transcript_path))
-
-        clips, clip_source = detect_clips(transcript, duration, job.get("niche"))
+        # Transcription and face tracking are opt-in from the Studio, so the
+        # build only needs the loudness curve to find candidate moments.
+        update_job(conn, job_id, stage="detect", progress=45)
+        clips, clip_source = detect_clips_from_audio(source, duration, job.get("niche"))
         if not clips:
             raise MediaError("No clips could be detected.")
 
@@ -178,11 +164,6 @@ def process_job(job_id: str) -> None:
         for index, clip in enumerate(clips, start=1):
             clip_id = uuid.uuid4().hex
             clip_ids.append(clip_id)
-            clip_dir = job_dir / "clips" / clip_id
-            clip_dir.mkdir(parents=True, exist_ok=True)
-            face_track = track_faces(source, clip["start"], clip["end"])
-            face_path = clip_dir / "face.json"
-            face_path.write_text(json.dumps(face_track, ensure_ascii=False), encoding="utf-8")
 
             conn.execute(
                 """
@@ -210,13 +191,13 @@ def process_job(job_id: str) -> None:
                     clip.get("badge") or default_badge,
                     preset["accent"],
                     meta_json,
-                    str(face_path),
+                    None,
                     now_iso(),
                 ),
             )
             conn.commit()
             progress = 70 + int((index / max(1, total)) * 28)
-            update_job(conn, job_id, stage="face_track", progress=min(98, progress))
+            update_job(conn, job_id, stage="clips", progress=min(98, progress))
 
         update_job(
             conn,

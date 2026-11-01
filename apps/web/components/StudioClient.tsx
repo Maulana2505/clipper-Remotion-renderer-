@@ -8,6 +8,7 @@ import {
   Captions,
   Check,
   Clock,
+  Crop,
   Download,
   Film,
   Flame,
@@ -23,6 +24,7 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
+import { cropRoom, normalizeCrop, type CropSettings } from "@clipper/video";
 import ClipPreview from "@/components/ClipPreview";
 import {
   api,
@@ -39,14 +41,13 @@ import {
   type TemplateItem,
 } from "@/lib/api";
 
-type StyleTab = "video" | "canvas" | "caption" | "font" | "brand";
+type StyleTab = "video" | "canvas" | "crop" | "caption" | "font" | "brand";
 
 const STAGES = [
   { id: "download", label: "Download" },
-  { id: "audio", label: "Audio" },
-  { id: "transcribe", label: "Transcribe" },
-  { id: "detect", label: "Detect hooks" },
-  { id: "face_track", label: "Face track" },
+  { id: "audio", label: "Audio scan" },
+  { id: "detect", label: "Find highlights" },
+  { id: "clips", label: "Build clips" },
   { id: "ready", label: "Ready" },
 ];
 
@@ -66,8 +67,15 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [renderingAll, setRenderingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [previewCrop, setPreviewCrop] = useState<CropSettings>({ x: 0.5, y: 0.5, zoom: 1 });
+  const [analysisVersion, setAnalysisVersion] = useState(0);
+  const [hasTranscript, setHasTranscript] = useState(false);
+  const [transcriptBusy, setTranscriptBusy] = useState(false);
+  const [faceBusy, setFaceBusy] = useState(false);
+  const [faceReady, setFaceReady] = useState(false);
   const clipsLoaded = useRef(false);
   const selectedIdRef = useRef<string | null>(null);
+  const cropTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedClip = useMemo(() => clips.find((clip) => clip.id === selectedId) || null, [clips, selectedId]);
   const selectedCanvas = useMemo(
@@ -110,6 +118,56 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  // Keep the crop editor in sync with the selected clip.
+  useEffect(() => {
+    setPreviewCrop(normalizeCrop(selectedClip?.crop));
+    setFaceReady(Boolean(selectedClip?.face_track_path));
+    setFaceBusy(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClip?.id]);
+
+  // Transcript exists? Checked once when the job opens.
+  useEffect(() => {
+    api(`/api/jobs/${jobId}/transcript`)
+      .then(() => setHasTranscript(true))
+      .catch(() => setHasTranscript(false));
+  }, [jobId]);
+
+  useEffect(() => {
+    if (!transcriptBusy) return;
+    const timer = setInterval(async () => {
+      try {
+        await api(`/api/jobs/${jobId}/transcript`);
+        setHasTranscript(true);
+        setTranscriptBusy(false);
+        setAnalysisVersion((value) => value + 1);
+        setNotice("Transcript ready — captions can be enabled now.");
+        setTimeout(() => setNotice(null), 2500);
+      } catch {
+        // still running
+      }
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [transcriptBusy, jobId]);
+
+  useEffect(() => {
+    if (!faceBusy || !selectedClip) return;
+    const clipId = selectedClip.id;
+    const timer = setInterval(async () => {
+      try {
+        await api(`/api/clips/${clipId}/face-track`);
+        setFaceReady(true);
+        setFaceBusy(false);
+        setAnalysisVersion((value) => value + 1);
+        setNotice("Face track ready.");
+        setTimeout(() => setNotice(null), 2200);
+      } catch {
+        // still running
+      }
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [faceBusy, selectedClip?.id]);
 
   useEffect(() => {
     Promise.all([
@@ -218,6 +276,46 @@ export default function StudioClient({ jobId }: { jobId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save clip.");
       await refreshJob();
+    }
+  }
+
+  function changeCrop(next: CropSettings) {
+    const safe = normalizeCrop(next);
+    setPreviewCrop(safe);
+    if (!selectedClip) return;
+    const clipId = selectedClip.id;
+    setClips((current) => current.map((clip) => (clip.id === clipId ? { ...clip, crop: safe } : clip)));
+    if (cropTimer.current) clearTimeout(cropTimer.current);
+    cropTimer.current = setTimeout(() => {
+      api<Clip>(`/api/clips/${clipId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ crop: safe }),
+      }).catch((err) => setError(err instanceof Error ? err.message : "Could not save crop."));
+    }, 450);
+  }
+
+  async function generateTranscript() {
+    if (!selectedClip || transcriptBusy) return;
+    setTranscriptBusy(true);
+    setError(null);
+    try {
+      await api(`/api/jobs/${jobId}/transcript`, { method: "POST" });
+      setNotice("Transcribing in the background…");
+    } catch (err) {
+      setTranscriptBusy(false);
+      setError(err instanceof Error ? err.message : "Could not start transcription.");
+    }
+  }
+
+  async function generateFaceTrack() {
+    if (!selectedClip || faceBusy) return;
+    setFaceBusy(true);
+    setError(null);
+    try {
+      await api(`/api/clips/${selectedClip.id}/face-track`, { method: "POST" });
+    } catch (err) {
+      setFaceBusy(false);
+      setError(err instanceof Error ? err.message : "Could not start face tracking.");
     }
   }
 
@@ -360,6 +458,10 @@ export default function StudioClient({ jobId }: { jobId: string }) {
                     accent={accent}
                     badge={selectedClip.badge}
                     meta={clipMeta}
+                    crop={previewCrop}
+                    cropMode={tab === "crop"}
+                    onCropChange={changeCrop}
+                    analysisVersion={analysisVersion}
                   />
                 ) : null}
               </div>
@@ -409,6 +511,14 @@ export default function StudioClient({ jobId }: { jobId: string }) {
               accent={accent}
               badgeSuggestions={nichePreset?.badges || []}
               patchClip={patchClip}
+              crop={previewCrop}
+              onCropChange={changeCrop}
+              hasTranscript={hasTranscript}
+              transcriptBusy={transcriptBusy}
+              onGenerateTranscript={generateTranscript}
+              faceBusy={faceBusy}
+              faceReady={faceReady}
+              onGenerateFaceTrack={generateFaceTrack}
             />
           </section>
 
@@ -490,7 +600,8 @@ function ProcessingPanel({ job }: { job: Job }) {
         })}
       </div>
       <p className="mt-5 text-center text-[11px] leading-relaxed text-zinc-600">
-        Download, transcription, hook detection, and face tracking run locally. Keep this tab open while the job is working.
+        Download and clip detection run locally. Transcription and face tracking stay off until you ask for them inside
+        the Studio. Keep this tab open while the job is working.
       </p>
     </div>
   );
@@ -507,6 +618,14 @@ function StylePanel({
   accent,
   badgeSuggestions,
   patchClip,
+  crop,
+  onCropChange,
+  hasTranscript,
+  transcriptBusy,
+  onGenerateTranscript,
+  faceBusy,
+  faceReady,
+  onGenerateFaceTrack,
 }: {
   tab: StyleTab;
   setTab: (tab: StyleTab) => void;
@@ -518,6 +637,14 @@ function StylePanel({
   accent: string;
   badgeSuggestions: string[];
   patchClip: (patch: Partial<Clip>, applyAll?: boolean) => Promise<void>;
+  crop: CropSettings;
+  onCropChange: (crop: CropSettings) => void;
+  hasTranscript: boolean;
+  transcriptBusy: boolean;
+  onGenerateTranscript: () => void;
+  faceBusy: boolean;
+  faceReady: boolean;
+  onGenerateFaceTrack: () => void;
 }) {
   if (!clip) return null;
   return (
@@ -548,10 +675,11 @@ function StylePanel({
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-5 gap-1 rounded-xl bg-black/30 p-1">
+      <div className="mt-4 grid grid-cols-6 gap-1 rounded-xl bg-black/30 p-1">
         {[
           { id: "video" as const, label: "Video", icon: Film },
           { id: "canvas" as const, label: "Canvas", icon: Layers },
+          { id: "crop" as const, label: "Crop", icon: Crop },
           { id: "caption" as const, label: "Caption", icon: Captions },
           { id: "font" as const, label: "Font", icon: Type },
           { id: "brand" as const, label: "Badge", icon: Sparkles },
@@ -613,8 +741,34 @@ function StylePanel({
           </div>
         ) : null}
 
+        {tab === "crop" ? (
+          <CropPanel
+            crop={crop}
+            onChange={onCropChange}
+            faceBusy={faceBusy}
+            faceReady={faceReady}
+            onGenerateFaceTrack={onGenerateFaceTrack}
+          />
+        ) : null}
+
         {tab === "caption" ? (
           <>
+            {!hasTranscript ? (
+              <div className="mb-2 rounded-xl border border-amber-300/20 bg-amber-300/5 p-3">
+                <div className="text-xs font-medium text-amber-200">No transcript yet</div>
+                <p className="mt-1 text-[10px] leading-relaxed text-amber-200/70">
+                  Captions stay empty until a transcript exists. Transcription is opt-in and runs locally.
+                </p>
+                <button
+                  onClick={onGenerateTranscript}
+                  disabled={transcriptBusy}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-[11px] font-semibold text-amber-100 hover:bg-amber-300/15 disabled:opacity-50"
+                >
+                  {transcriptBusy ? <Loader2 size={12} className="animate-spin" /> : <Captions size={12} />}
+                  {transcriptBusy ? "Transcribing…" : "Generate transcript"}
+                </button>
+              </div>
+            ) : null}
             <div className="mb-2 flex items-center justify-between rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
               <div>
                 <div className="text-xs font-medium text-white">Captions</div>
@@ -668,6 +822,114 @@ function StylePanel({
         ) : null}
       </div>
     </aside>
+  );
+}
+
+/**
+ * Manual crop: pan/zoom the cover-fitted frame. Transcript and face tracking
+ * are deliberately not part of the build; face tracking is offered here as an
+ * optional extra for layouts that need a moving focus point.
+ */
+function CropPanel({
+  crop,
+  onChange,
+  faceBusy,
+  faceReady,
+  onGenerateFaceTrack,
+}: {
+  crop: CropSettings;
+  onChange: (crop: CropSettings) => void;
+  faceBusy: boolean;
+  faceReady: boolean;
+  onGenerateFaceTrack: () => void;
+}) {
+  const room = cropRoom(crop.zoom);
+  const min = 0.5 - room;
+  const max = 0.5 + room;
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-medium text-white">Zoom</span>
+          <span className="tabular-nums text-zinc-400">{Math.round(crop.zoom * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min={100}
+          max={300}
+          step={5}
+          value={Math.round(crop.zoom * 100)}
+          onChange={(event) => {
+            const zoom = Number(event.target.value) / 100;
+            onChange(normalizeCrop({ ...crop, zoom }));
+          }}
+          className="mt-2 w-full accent-lime"
+        />
+        <p className="mt-1 text-[10px] text-zinc-600">100% is the plain center crop.</p>
+      </div>
+
+      {(
+        [
+          { key: "x" as const, label: "Horizontal" },
+          { key: "y" as const, label: "Vertical" },
+        ]
+      ).map((axis) => (
+        <div key={axis.key} className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-white">{axis.label}</span>
+            <span className="tabular-nums text-zinc-400">{Math.round(crop[axis.key] * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min={Math.round(min * 100)}
+            max={Math.round(max * 100)}
+            step={1}
+            value={Math.round(crop[axis.key] * 100)}
+            disabled={room <= 0.001}
+            onChange={(event) => onChange(normalizeCrop({ ...crop, [axis.key]: Number(event.target.value) / 100 }))}
+            className="mt-2 w-full accent-lime disabled:opacity-40"
+          />
+        </div>
+      ))}
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => onChange({ x: 0.5, y: 0.5, zoom: 1 })}
+          className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] font-medium text-zinc-300 hover:bg-white/5"
+        >
+          Reset crop
+        </button>
+        <button
+          onClick={() => onChange({ ...crop, x: 0.5, y: 0.5 })}
+          className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] font-medium text-zinc-300 hover:bg-white/5"
+        >
+          Center
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <div className="flex items-center gap-2 text-xs font-medium text-white">
+          <ScanFace size={13} className="text-lime" /> Face tracking (optional)
+        </div>
+        <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+          Not part of the build. Run it only when a layout&apos;s face bubble or PiP should follow a face; otherwise the
+          crop point is used.
+        </p>
+        <button
+          onClick={onGenerateFaceTrack}
+          disabled={faceBusy}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-panel2 px-3 py-2 text-[11px] font-medium text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+        >
+          {faceBusy ? <Loader2 size={12} className="animate-spin" /> : <ScanFace size={12} />}
+          {faceBusy ? "Tracking…" : faceReady ? "Re-run face track" : "Auto-detect face"}
+        </button>
+      </div>
+
+      <p className="text-center text-[10px] text-zinc-600">
+        Drag inside the preview to pan while this tab is open.
+      </p>
+    </div>
   );
 }
 

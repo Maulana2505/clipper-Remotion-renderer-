@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import threading
 import uuid
 from pathlib import Path
 
@@ -11,13 +12,55 @@ from fastapi.responses import FileResponse
 from ..core.config import JOBS_DIR
 from ..db import get_conn, now_iso, row_to_dict
 from ..schemas import JobCreate
-from ..services.media import MediaError, ensure_disk_space, is_safe_url, probe_url_duration
+from ..services.media import MediaError, ensure_disk_space, extract_audio, is_safe_url, probe_url_duration
 from ..services.pipeline import process_job
+from ..services.transcribe import fallback_transcript, transcribe_audio, transcribe_from_vtt
 from ..templates import NICHE_BY_ID
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"}
+
+# Transcription is opt-in: the job pipeline no longer runs Whisper, the Studio
+# asks for it only when the user wants captions.
+_TRANSCRIPT_RUNNING: set[str] = set()
+_TRANSCRIPT_LOCK = threading.Lock()
+
+
+def _run_transcript(job_id: str) -> None:
+    try:
+        with get_conn() as conn:
+            job = row_to_dict(
+                conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            )
+        if not job or not job.get("video_path"):
+            return
+        source = Path(job["video_path"])
+        if not source.exists():
+            return
+        job_dir = source.parent
+        duration = float(job.get("duration") or 0.0)
+        audio = extract_audio(source, job_dir / "audio.wav")
+        transcript = transcribe_audio(audio, duration)
+        if transcript is None:
+            vtts = sorted(job_dir.glob("subs*.vtt"))
+            transcript = transcribe_from_vtt(vtts[0], duration) if vtts else None
+        if transcript is None:
+            transcript = fallback_transcript(duration)
+        path = job_dir / "transcript.json"
+        path.write_text(json.dumps(transcript, ensure_ascii=False, indent=2), encoding="utf-8")
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE jobs SET transcript_path = ?, updated_at = ? WHERE id = ?",
+                (str(path), now_iso(), job_id),
+            )
+            conn.commit()
+        print(f"[transcript] job {job_id} ready")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[transcript] job {job_id} failed: {exc}")
+    finally:
+        with _TRANSCRIPT_LOCK:
+            _TRANSCRIPT_RUNNING.discard(job_id)
 
 
 def _create_job(
@@ -201,8 +244,6 @@ def get_job_clips(job_id: str):
 
 @router.get("/{job_id}/transcript")
 def get_job_transcript(job_id: str):
-    import json
-
     with get_conn() as conn:
         row = conn.execute("SELECT transcript_path FROM jobs WHERE id = ?", (job_id,)).fetchone()
     if row is None or not row["transcript_path"]:
@@ -211,6 +252,23 @@ def get_job_transcript(job_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="Transcript file not found.")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+@router.post("/{job_id}/transcript")
+def generate_job_transcript(job_id: str, force: bool = False):
+    """Opt-in transcription. Runs in the background; poll the GET endpoint."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT transcript_path FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    if row["transcript_path"] and Path(row["transcript_path"]).exists() and not force:
+        return {"status": "ready"}
+    with _TRANSCRIPT_LOCK:
+        if job_id in _TRANSCRIPT_RUNNING:
+            return {"status": "running"}
+        _TRANSCRIPT_RUNNING.add(job_id)
+    threading.Thread(target=_run_transcript, args=(job_id,), daemon=True).start()
+    return {"status": "running"}
 
 
 @router.get("/{job_id}/video")

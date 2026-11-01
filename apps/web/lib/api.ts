@@ -38,6 +38,12 @@ export interface Job {
   clip_count?: number;
 }
 
+export interface CropSettings {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
 export interface Clip {
   id: string;
   job_id: string;
@@ -56,6 +62,7 @@ export interface Clip {
   badge?: string | null;
   accent?: string | null;
   meta?: ClipMeta | null;
+  crop?: CropSettings | null;
   face_track_path?: string | null;
   created_at: string;
 }

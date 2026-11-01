@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import {
   ClipComposition,
+  normalizeCrop,
   type CaptionId,
   type ClipMeta,
   type ClipProps,
+  type CropSettings,
   type FontId,
   type LayoutId,
   type Word,
@@ -29,6 +31,11 @@ type Props = {
   accent?: string;
   badge?: string | null;
   meta?: ClipMeta;
+  crop?: CropSettings | null;
+  cropMode?: boolean;
+  onCropChange?: (crop: CropSettings) => void;
+  /** Re-fetch the transcript/face track after they are generated on demand. */
+  analysisVersion?: number;
 };
 
 /**
@@ -46,10 +53,17 @@ export default function ClipPreview({
   accent = "#CCFF00",
   badge = null,
   meta,
+  crop = null,
+  cropMode = false,
+  onCropChange,
+  analysisVersion = 0,
 }: Props) {
   const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [faceTrack, setFaceTrack] = useState<FaceTrack | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef<{ x: number; y: number; crop: CropSettings } | null>(null);
+  const activeCrop = useMemo(() => normalizeCrop(crop), [crop]);
 
   useEffect(() => {
     let active = true;
@@ -71,7 +85,7 @@ export default function ClipPreview({
     return () => {
       active = false;
     };
-  }, [job.id, clip.id]);
+  }, [job.id, clip.id, analysisVersion]);
 
   const words = useMemo<Word[]>(() => {
     const all: Word[] = [];
@@ -113,6 +127,7 @@ export default function ClipPreview({
       },
       media: { mode: "video" },
       layout: videoTemplate as LayoutId,
+      crop: activeCrop,
       caption: {
         template: (captionTemplate as CaptionId) || "plain_white",
         font: (fontPreset as FontId) || "anton",
@@ -140,10 +155,50 @@ export default function ClipPreview({
       faceKeyframes,
       badge,
       meta,
+      activeCrop,
     ],
   );
 
   const duration = Math.max(1, Math.round((clip.end_time - clip.start_time) * 30));
+
+  const beginDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!cropMode || !onCropChange) return;
+    event.preventDefault();
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Older browsers without pointer capture still pan through pointermove.
+    }
+    dragRef.current = { x: event.clientX, y: event.clientY, crop: activeCrop };
+    setDragging(true);
+  };
+
+  const moveDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragRef.current;
+    if (!start || !onCropChange) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const zoom = Math.max(1, start.crop.zoom);
+    onCropChange(
+      normalizeCrop({
+        ...start.crop,
+        x: start.crop.x - (event.clientX - start.x) / (rect.width * zoom),
+        y: start.crop.y - (event.clientY - start.y) / (rect.height * zoom),
+      }),
+    );
+  };
+
+  const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    setDragging(false);
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   if (error) {
     return (
@@ -158,7 +213,7 @@ export default function ClipPreview({
       className="mx-auto w-full"
       style={{ maxWidth: `min(100%, calc(70vh * ${canvas.width / canvas.height}))` }}
     >
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl">
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl">
         <Player
           component={ClipComposition}
           durationInFrames={duration}
@@ -167,11 +222,32 @@ export default function ClipPreview({
           fps={30}
           inputProps={inputProps}
           style={{ width: "100%" }}
-          controls
+          controls={!cropMode}
           loop
-          doubleClickToFullscreen
+          doubleClickToFullscreen={!cropMode}
           acknowledgeRemotionLicense
         />
+        {cropMode ? (
+          <div
+            onPointerDown={beginDrag}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            className={`absolute inset-0 z-10 cursor-move touch-none border-2 transition ${
+              dragging ? "border-lime bg-lime/5" : "border-lime/40"
+            }`}
+          >
+            <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-30">
+              {Array.from({ length: 9 }).map((_, index) => (
+                <div key={index} className="border border-white/30" />
+              ))}
+            </div>
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-lime/70" />
+            <span className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-medium text-lime">
+              Drag to pan · {Math.round(activeCrop.zoom * 100)}%
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

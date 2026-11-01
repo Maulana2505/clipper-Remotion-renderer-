@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS clips (
     caption_enabled INTEGER NOT NULL DEFAULT 1,
     font_preset TEXT NOT NULL DEFAULT 'anton',
     face_track_path TEXT,
+    crop_json TEXT,
     created_at TEXT NOT NULL
 );
 
@@ -97,6 +98,8 @@ MIGRATIONS: list[tuple[str, str, str]] = [
     ("jobs", "source_start", "REAL"),
     ("jobs", "source_end", "REAL"),
     ("jobs", "meta_json", "TEXT"),
+    ("clips", "face_track_path", "TEXT"),
+    ("clips", "crop_json", "TEXT"),
     ("clips", "badge", "TEXT"),
     ("clips", "accent", "TEXT"),
     ("clips", "meta_json", "TEXT"),
@@ -162,6 +165,15 @@ def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
                 data["meta"] = None
         else:
             data["meta"] = None
+    if "crop_json" in data:
+        raw = data["crop_json"]
+        if isinstance(raw, str) and raw.strip():
+            try:
+                data["crop"] = json.loads(raw)
+            except json.JSONDecodeError:
+                data["crop"] = None
+        else:
+            data["crop"] = None
     return data
 
 

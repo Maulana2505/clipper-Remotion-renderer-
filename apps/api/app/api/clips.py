@@ -1,15 +1,58 @@
 from __future__ import annotations
 
 import json
+import threading
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
 from ..db import get_conn, row_to_dict
 from ..schemas import ClipPatch
+from ..services.face import track_faces
 from ..templates import CANVAS_BY_ID, CAPTION_BY_ID, FONT_BY_ID, VIDEO_TEMPLATES
 
 router = APIRouter(prefix="/api/clips", tags=["clips"])
 VIDEO_TEMPLATE_IDS = {item["id"] for item in VIDEO_TEMPLATES}
+
+# Face tracking is opt-in and slow, so it runs in the background and only once
+# per clip at a time.
+_FACE_RUNNING: set[str] = set()
+_FACE_LOCK = threading.Lock()
+
+
+def _face_track_path(job_dir: Path, clip_id: str) -> Path:
+    return job_dir / "clips" / clip_id / "face.json"
+
+
+def _run_face_track(clip_id: str) -> None:
+    try:
+        with get_conn() as conn:
+            clip = row_to_dict(conn.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone())
+            if clip is None:
+                return
+            job = row_to_dict(
+                conn.execute("SELECT * FROM jobs WHERE id = ?", (clip["job_id"],)).fetchone()
+            )
+        if not job or not job.get("video_path"):
+            return
+        source = Path(job["video_path"])
+        if not source.exists():
+            return
+        track = track_faces(source, float(clip["start_time"]), float(clip["end_time"]))
+        destination = _face_track_path(source.parent, clip_id)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(track, ensure_ascii=False), encoding="utf-8")
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE clips SET face_track_path = ? WHERE id = ?", (str(destination), clip_id)
+            )
+            conn.commit()
+        print(f"[face] tracked clip {clip_id} ({len(track.get('keyframes') or [])} keyframes)")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[face] clip {clip_id} failed: {exc}")
+    finally:
+        with _FACE_LOCK:
+            _FACE_RUNNING.discard(clip_id)
 
 
 @router.get("/{clip_id}")
@@ -23,8 +66,6 @@ def get_clip(clip_id: str):
 
 @router.get("/{clip_id}/face-track")
 def get_clip_face_track(clip_id: str):
-    from pathlib import Path
-
     with get_conn() as conn:
         row = conn.execute("SELECT face_track_path FROM clips WHERE id = ?", (clip_id,)).fetchone()
     if row is None or not row["face_track_path"]:
@@ -33,6 +74,21 @@ def get_clip_face_track(clip_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="Face track file not found.")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+@router.post("/{clip_id}/face-track")
+def generate_clip_face_track(clip_id: str):
+    """Opt-in face tracking for one clip. Runs in the background."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT id FROM clips WHERE id = ?", (clip_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Clip not found.")
+    with _FACE_LOCK:
+        if clip_id in _FACE_RUNNING:
+            return {"status": "running"}
+        _FACE_RUNNING.add(clip_id)
+    threading.Thread(target=_run_face_track, args=(clip_id,), daemon=True).start()
+    return {"status": "running"}
 
 
 @router.patch("/{clip_id}")
@@ -88,6 +144,9 @@ def update_clip(clip_id: str, payload: ClipPatch):
             params.append(json.dumps(values, ensure_ascii=False))
         else:
             updates.append("meta_json = NULL")
+    if payload.crop is not None:
+        updates.append("crop_json = ?")
+        params.append(json.dumps(payload.crop.model_dump(), ensure_ascii=False))
 
     if not updates:
         return get_clip(clip_id)
