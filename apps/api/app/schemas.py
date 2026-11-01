@@ -119,6 +119,10 @@ class LlmTestRequest(BaseModel):
     base_url: str | None = None
 
 
+class WhisperSettingsUpdate(BaseModel):
+    model: str = Field(default="small", min_length=1, max_length=40)
+
+
 __all__ = [
     "JobMeta",
     "JobCreate",
@@ -128,4 +132,5 @@ __all__ = [
     "RenderRequest",
     "LlmSettingsUpdate",
     "LlmTestRequest",
+    "WhisperSettingsUpdate",
 ]

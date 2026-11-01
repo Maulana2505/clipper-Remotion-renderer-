@@ -4,7 +4,8 @@ from fastapi import APIRouter, HTTPException
 
 from ..core.security import decrypt_secret, encrypt_secret, mask_secret
 from ..db import get_conn, now_iso
-from ..schemas import LlmSettingsUpdate, LlmTestRequest
+from ..core.config import WHISPER_MODEL
+from ..schemas import LlmSettingsUpdate, LlmTestRequest, WhisperSettingsUpdate
 from ..services.llm import test_connection
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -18,6 +19,7 @@ def _serialize(row) -> dict:
             "base_url": None,
             "temperature": 0.3,
             "max_clips": 20,
+            "whisper_model": WHISPER_MODEL,
             "api_key_masked": "",
             "configured": False,
         }
@@ -29,6 +31,7 @@ def _serialize(row) -> dict:
         "base_url": data.get("base_url"),
         "temperature": float(data.get("temperature") or 0.3),
         "max_clips": int(data.get("max_clips") or 20),
+        "whisper_model": data.get("whisper_model") or WHISPER_MODEL,
         "api_key_masked": mask_secret(api_key),
         "configured": bool(api_key),
         "updated_at": data.get("updated_at"),
@@ -102,3 +105,28 @@ def clear_llm_settings():
         conn.commit()
         row = conn.execute("SELECT * FROM app_settings WHERE id = 1").fetchone()
     return _serialize(row)
+
+@router.get("/whisper")
+def get_whisper_settings():
+    with get_conn() as conn:
+        row = conn.execute("SELECT whisper_model FROM app_settings WHERE id = 1").fetchone()
+    model = (row["whisper_model"] if row else None) or WHISPER_MODEL
+    return {"model": model}
+
+
+@router.put("/whisper")
+def save_whisper_settings(payload: WhisperSettingsUpdate):
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO app_settings (id, provider, model, temperature, max_clips, whisper_model, updated_at)
+            VALUES (1, 'openai', 'gpt-4o-mini', 0.3, 20, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                whisper_model = excluded.whisper_model,
+                updated_at = excluded.updated_at
+            """,
+            (payload.model, now_iso()),
+        )
+        conn.commit()
+        row = conn.execute("SELECT whisper_model FROM app_settings WHERE id = 1").fetchone()
+    return {"model": (row["whisper_model"] if row else None) or WHISPER_MODEL}

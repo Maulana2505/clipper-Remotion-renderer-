@@ -7,11 +7,25 @@ from ..core.config import WHISPER_MODEL
 
 _MODEL = None
 _BATCHED = None
+_MODEL_NAME = None
+
+
+def get_whisper_model_name() -> str:
+    try:
+        from ..db import get_conn
+        with get_conn() as conn:
+            row = conn.execute("SELECT whisper_model FROM app_settings WHERE id = 1").fetchone()
+        if row and row["whisper_model"]:
+            return str(row["whisper_model"])
+    except Exception:  # noqa: BLE001
+        pass
+    return WHISPER_MODEL
 
 
 def _load_models():
-    global _MODEL, _BATCHED
-    if _MODEL is not None:
+    global _MODEL, _BATCHED, _MODEL_NAME
+    wanted = get_whisper_model_name()
+    if _MODEL is not None and _MODEL_NAME == wanted:
         return _MODEL, _BATCHED
     from faster_whisper import WhisperModel  # type: ignore
 
@@ -21,7 +35,7 @@ def _load_models():
         BatchedInferencePipeline = None  # type: ignore
 
     cpu_threads = max(1, (os.cpu_count() or 2) - 1)
-    model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", cpu_threads=cpu_threads, num_workers=1)
+    model = WhisperModel(wanted, device="cpu", compute_type="int8", cpu_threads=cpu_threads, num_workers=1)
     batched = None
     if BatchedInferencePipeline is not None:
         try:
@@ -30,6 +44,7 @@ def _load_models():
             batched = None
     _MODEL = model
     _BATCHED = batched
+    _MODEL_NAME = wanted
     return model, batched
 
 

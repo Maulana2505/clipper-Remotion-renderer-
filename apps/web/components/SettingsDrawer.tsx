@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, KeyRound, Loader2, Trash2, X } from "lucide-react";
-import { api, type LlmSettings } from "@/lib/api";
+import { api, type LlmSettings, type WhisperSettings } from "@/lib/api";
 
 type Props = {
   open: boolean;
@@ -24,6 +24,8 @@ export default function SettingsDrawer({ open, onClose }: Props) {
   const [baseUrl, setBaseUrl] = useState("");
   const [temperature, setTemperature] = useState(0.3);
   const [maxClips, setMaxClips] = useState(20);
+  const [whisperModel, setWhisperModel] = useState("small");
+  const [whisperBusy, setWhisperBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -42,6 +44,13 @@ export default function SettingsDrawer({ open, onClose }: Props) {
         setApiKey("");
       })
       .catch((error) => setMessage({ kind: "error", text: error.message }));
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    api<WhisperSettings>("/api/settings/whisper")
+      .then((data) => setWhisperModel(data.model || "small"))
+      .catch(() => {});
   }, [open]);
 
   function selectProvider(id: string) {
@@ -95,6 +104,23 @@ export default function SettingsDrawer({ open, onClose }: Props) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : "Save failed." });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveWhisper() {
+    setWhisperBusy(true);
+    setMessage(null);
+    try {
+      const data = await api<WhisperSettings>("/api/settings/whisper", {
+        method: "PUT",
+        body: JSON.stringify({ model: whisperModel }),
+      });
+      setWhisperModel(data.model);
+      setMessage({ kind: "ok", text: "Whisper model saved." });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : "Save failed." });
+    } finally {
+      setWhisperBusy(false);
     }
   }
 
@@ -214,6 +240,34 @@ export default function SettingsDrawer({ open, onClose }: Props) {
                 className="w-full rounded-xl border border-white/10 bg-panel px-3 py-2.5 text-sm text-white"
               />
             </label>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-panel p-4">
+            <div className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-400">Transcription model (Whisper)</div>
+            <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+              Smaller = faster but less accurate. Applied to new transcription jobs.
+            </p>
+            <div className="flex gap-2">
+              <select
+                value={whisperModel}
+                onChange={(event) => setWhisperModel(event.target.value)}
+                className="flex-1 rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
+              >
+                <option value="tiny">tiny — fastest, lowest quality</option>
+                <option value="base">base — fast, OK for clean audio</option>
+                <option value="small">small — balanced (recommended)</option>
+                <option value="medium">medium — slower, more accurate</option>
+                <option value="large-v3">large-v3 — slowest, best (needs RAM)</option>
+              </select>
+              <button
+                onClick={saveWhisper}
+                disabled={whisperBusy}
+                className="flex items-center justify-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-semibold text-black hover:bg-lime/90 disabled:opacity-50"
+              >
+                {whisperBusy ? <Loader2 size={15} className="animate-spin" /> : null}
+                Save
+              </button>
+            </div>
           </div>
 
           {message ? (

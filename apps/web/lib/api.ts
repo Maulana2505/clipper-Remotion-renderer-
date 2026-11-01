@@ -147,6 +147,10 @@ export interface FontPreset {
   family: string;
 }
 
+export interface WhisperSettings {
+  model: string;
+}
+
 export interface LlmSettings {
   provider: string;
   model: string;

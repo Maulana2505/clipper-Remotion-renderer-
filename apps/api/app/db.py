@@ -108,6 +108,7 @@ MIGRATIONS: list[tuple[str, str, str]] = [
     ("clips", "meta_json", "TEXT"),
     ("clips", "reason", "TEXT"),
     ("clips", "signals_json", "TEXT"),
+    ("app_settings", "whisper_model", "TEXT"),
     ("renders", "engine", "TEXT"),
     ("renders", "duration_ms", "INTEGER"),
 ]
