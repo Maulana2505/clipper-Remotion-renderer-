@@ -78,7 +78,6 @@ VIDEO_TEMPLATES: list[dict] = [
     {"id": "hook_intro", "name": "Hook Intro", "description": "Opening title card", "requires_face_track": False},
     {"id": "progress_bar", "name": "Progress Bar", "description": "Thin animated progress bar", "requires_face_track": False},
     {"id": "minimal_frame", "name": "Minimal Frame", "description": "Clean border and padding", "requires_face_track": False},
-    {"id": "gaming_hud", "name": "Gaming HUD", "description": "Facecam bubble, mood badge, progress bar", "requires_face_track": True, "niche": "gaming"},
     {"id": "football_scoreboard", "name": "Football Scoreboard", "description": "Action focus, no scoreboard", "requires_face_track": False, "niche": "football"},
     {"id": "football_scoreboard_bottom", "name": "Football Scoreboard Bottom", "description": "Action focus, badge at bottom", "requires_face_track": False, "niche": "football"},
     {"id": "football_minimal", "name": "Football Minimal", "description": "Badge and progress only", "requires_face_track": False, "niche": "football"},
@@ -88,18 +87,11 @@ VIDEO_TEMPLATES: list[dict] = [
     {"id": "football_vertical_stack", "name": "Football Vertical Stack", "description": "Vertical action layout", "requires_face_track": False, "niche": "football"},
     {"id": "duo_split", "name": "Duo Split", "description": "Two speakers stacked with name tags", "requires_face_track": False, "niche": "podcast"},
     {"id": "lower_third", "name": "Lower Third", "description": "Speaker and topic card", "requires_face_track": False, "niche": "education"},
-    {"id": "gaming_hud_left", "name": "Gaming HUD Left", "description": "Facecam bubble on the right", "requires_face_track": True, "niche": "gaming"},
-    {"id": "gaming_hud_top", "name": "Gaming HUD Top", "description": "Facecam bubble on top", "requires_face_track": True, "niche": "gaming"},
-    {"id": "gaming_minimal", "name": "Gaming Minimal", "description": "Badge and progress only", "requires_face_track": False, "niche": "gaming"},
-    {"id": "gaming_neon", "name": "Gaming Neon", "description": "Neon frame + facecam", "requires_face_track": True, "niche": "gaming"},
-    {"id": "gaming_reaction", "name": "Gaming Reaction", "description": "Big facecam + gameplay PiP", "requires_face_track": True, "niche": "gaming"},
-    {"id": "gaming_split", "name": "Gaming Split", "description": "Gameplay top, facecam bottom", "requires_face_track": True, "niche": "gaming"},
-    {"id": "gaming_glass", "name": "Gaming Glass", "description": "Glassmorphism panel + neon", "requires_face_track": True, "niche": "gaming"},
-    {"id": "gaming_esports", "name": "Gaming Esports", "description": "Esports broadcast bar", "requires_face_track": True, "niche": "gaming"},
-    {"id": "gaming_stream", "name": "Gaming Stream", "description": "Stream overlay with facecam", "requires_face_track": True, "niche": "gaming"},
-    {"id": "gaming_minimal_neon", "name": "Gaming Minimal Neon", "description": "Neon frame, minimal", "requires_face_track": False, "niche": "gaming"},
-    {"id": "gaming_cinematic", "name": "Gaming Cinematic", "description": "Cinematic bars + badge", "requires_face_track": False, "niche": "gaming"},
-    {"id": "gaming_vertical_stack", "name": "Gaming Vertical Stack", "description": "Gameplay top, facecam bottom modern", "requires_face_track": True, "niche": "gaming"},
+    {"id": "gaming_classic_split", "name": "Gaming Classic Split", "description": "Facecam 34% top, gameplay 54% below", "requires_face_track": True, "niche": "gaming", "visible_by_default": True},
+    {"id": "gaming_pip_overlay", "name": "Gaming PiP Overlay", "description": "Full-bleed gameplay with circular facecam", "requires_face_track": True, "niche": "gaming", "visible_by_default": True},
+    {"id": "gaming_tri_zone", "name": "Gaming Tri Zone", "description": "Facecam, crosshair gameplay and killfeed HUD", "requires_face_track": True, "niche": "gaming", "visible_by_default": True},
+    {"id": "gaming_cinematic_blur", "name": "Gaming Cinematic Blur", "description": "16:9 gameplay over a blurred backdrop", "requires_face_track": False, "niche": "gaming", "visible_by_default": True},
+    {"id": "gaming_duo_versus", "name": "Gaming Duo Versus", "description": "Two facecams P1 vs P2 above the gameplay", "requires_face_track": True, "niche": "gaming", "visible_by_default": True},
     {"id": "duo_split_horizontal", "name": "Duo Split Horizontal", "description": "Two speakers side by side", "requires_face_track": False, "niche": "podcast"},
     {"id": "solo_podcast", "name": "Solo Podcast", "description": "Single speaker lower third", "requires_face_track": False, "niche": "podcast"},
     {"id": "podcast_quote", "name": "Podcast Quote", "description": "Big quote card", "requires_face_track": False, "niche": "podcast"},
@@ -208,7 +200,7 @@ NICHE_PRESETS: list[dict] = [
         "id": "gaming",
         "name": "Gaming",
         "canvas": "vertical_9x16",
-        "video_template": "gaming_hud",
+        "video_template": "gaming_classic_split",
         "caption_template": "accent_highlight",
         "font_preset": "anton",
         "accent": "#CCFF00",
@@ -268,7 +260,9 @@ NICHE_BY_ID = {item["id"]: item for item in NICHE_PRESETS}
 # experimenting. Set INCLUDE_HIDDEN_TEMPLATES=1 (or pass include_hidden=true
 # to /api/video-templates) to reveal them.
 HIDDEN_TEMPLATE_IDS: set[str] = {
-    t["id"] for t in VIDEO_TEMPLATES if t.get("niche") not in (None, "", "generic")
+    t["id"]
+    for t in VIDEO_TEMPLATES
+    if t.get("niche") not in (None, "", "generic") and not t.get("visible_by_default")
 }
 
 

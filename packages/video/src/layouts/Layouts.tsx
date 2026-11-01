@@ -1,7 +1,6 @@
 import React from 'react';
 import {spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {ClipMeta, ClipProps, CanvasSpec} from '../types';
-import {safeAreaOf} from '../types';
 import {fontFamilyOf} from '../fonts';
 import {FocusMedia, MainMedia, OverlayBubble, focusAt} from '../media';
 
@@ -159,38 +158,6 @@ const FaceBubble: React.FC<{
         backgroundColor: '#000',
       }}
     />
-  );
-};
-
-const GamingHud: React.FC<LayoutProps> = ({props, time}) => {
-  const {canvas, caption, meta} = props;
-  const safe = safeAreaOf(canvas);
-  const bubbleWidth = Math.round(canvas.width * 0.3);
-  const margin = Math.round(canvas.width * 0.045);
-
-  return (
-    <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <TopScrim />
-      <FaceBubble
-        props={props}
-        time={time}
-        accent={caption.accent}
-        sizeScale={0.3}
-        zoom={4}
-        top={margin}
-        left={margin}
-      />
-      <Badge
-        text={meta?.badge}
-        accent={caption.accent}
-        canvas={canvas}
-        top={margin + bubbleWidth * 0.15}
-        left={margin + bubbleWidth + canvas.width * 0.02}
-        right={margin}
-      />
-      <ProgressBar accent={caption.accent} canvas={canvas} />
-    </>
   );
 };
 
@@ -509,214 +476,660 @@ const LegacyLayout: React.FC<LayoutProps> = ({props, time}) => {
   }
 };
 
-// ---------- Gaming variants ----------
+// ---------- Gaming templates ----------
 
-const GamingHudLeft: React.FC<LayoutProps> = ({props, time}) => {
-  const {canvas, caption, meta} = props;
-  const margin = Math.round(canvas.width * 0.045);
-  const bubbleWidth = Math.round(canvas.width * 0.3);
+/** Small glass/neon label used across the gaming layouts. */
+const Pill: React.FC<{
+  text: string;
+  accent: string;
+  canvas: CanvasSpec;
+  style?: React.CSSProperties;
+  solid?: boolean;
+}> = ({text, accent, canvas, style, solid = false}) => {
+  const fontSize = Math.round(canvas.width * 0.026);
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        fontFamily: fontFamilyOf('inter'),
+        fontWeight: 800,
+        fontSize,
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        color: solid ? '#06070a' : '#ffffff',
+        background: solid ? accent : 'rgba(6,7,10,0.62)',
+        border: `1px solid ${accent}88`,
+        borderRadius: 999,
+        padding: `${Math.round(fontSize * 0.32)}px ${Math.round(fontSize * 0.7)}px`,
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
+    >
+      {text}
+    </div>
+  );
+};
+
+/** Hairline accent divider with a neon glow. */
+const NeonDivider: React.FC<{
+  top: number;
+  accent: string;
+  height?: number;
+  glow?: number;
+}> = ({top, accent, height = 4, glow = 22}) => (
+  <div
+    style={{
+      position: 'absolute',
+      top: top - Math.round(height / 2),
+      left: 0,
+      right: 0,
+      height,
+      background: `linear-gradient(90deg, ${accent}00, ${accent}, ${accent}00)`,
+      boxShadow: `0 0 ${glow}px ${accent}`,
+    }}
+  />
+);
+
+/** Tactical corner brackets that frame the gameplay area. */
+const CornerBrackets: React.FC<{
+  accent: string;
+  inset: number;
+  size: number;
+  thickness?: number;
+}> = ({accent, inset, size, thickness = 3}) => {
+  const base: React.CSSProperties = {
+    position: 'absolute',
+    width: size,
+    height: size,
+    pointerEvents: 'none',
+  };
   return (
     <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <TopScrim />
-      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.3} zoom={4} top={margin} left={canvas.width - bubbleWidth - margin} />
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin + bubbleWidth * 0.15} right={margin + bubbleWidth + canvas.width * 0.02} />
-      <ProgressBar accent={caption.accent} canvas={canvas} />
+      <div
+        style={{
+          ...base,
+          top: inset,
+          left: inset,
+          borderTop: `${thickness}px solid ${accent}`,
+          borderLeft: `${thickness}px solid ${accent}`,
+        }}
+      />
+      <div
+        style={{
+          ...base,
+          top: inset,
+          right: inset,
+          borderTop: `${thickness}px solid ${accent}`,
+          borderRight: `${thickness}px solid ${accent}`,
+        }}
+      />
+      <div
+        style={{
+          ...base,
+          bottom: inset,
+          left: inset,
+          borderBottom: `${thickness}px solid ${accent}`,
+          borderLeft: `${thickness}px solid ${accent}`,
+        }}
+      />
+      <div
+        style={{
+          ...base,
+          bottom: inset,
+          right: inset,
+          borderBottom: `${thickness}px solid ${accent}`,
+          borderRight: `${thickness}px solid ${accent}`,
+        }}
+      />
     </>
   );
 };
 
-const GamingHudTop: React.FC<LayoutProps> = ({props, time}) => {
-  const {canvas, caption, meta} = props;
-  const margin = Math.round(canvas.width * 0.045);
-  const bubbleWidth = Math.round(canvas.width * 0.26);
-  return (
-    <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <TopScrim />
-      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.26} zoom={4} top={margin} left={Math.round((canvas.width - bubbleWidth) / 2)} />
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin + bubbleWidth + canvas.height * 0.02} align="center" />
-      <ProgressBar accent={caption.accent} canvas={canvas} />
-    </>
-  );
-};
+/** Facecam panel. A circle when `radius` is half the width. */
+const CamPanel: React.FC<{
+  props: ClipProps;
+  focus: {x: number; y: number};
+  zoom: number;
+  width: number;
+  height: number;
+  radius: number;
+  accent: string;
+  style?: React.CSSProperties;
+}> = ({props, focus, zoom, width, height, radius, accent, style}) => (
+  <FocusMedia
+    props={props}
+    focus={focus}
+    zoom={zoom}
+    width={width}
+    height={height}
+    rounded={radius}
+    style={{
+      position: 'absolute',
+      border: `4px solid ${accent}`,
+      boxShadow: `0 18px 44px rgba(0,0,0,0.6), 0 0 24px ${accent}44`,
+      backgroundColor: '#05060a',
+      ...style,
+    }}
+  />
+);
 
-const GamingMinimal: React.FC<LayoutProps> = ({props}) => {
+// CLASSIC_SPLIT: webcam 34% on top, gameplay 54% below, captions in the rest.
+const GamingClassicSplit: React.FC<LayoutProps> = ({props, time}) => {
   const {canvas, caption, meta} = props;
-  const margin = Math.round(canvas.width * 0.06);
+  const faceH = Math.round(canvas.height * 0.34);
+  const gameH = Math.round(canvas.height * 0.54);
+  const hudTop = faceH + gameH;
+  const face = focusAt(props, time);
   return (
     <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', inset: margin, border: `1px solid ${caption.accent}44`, borderRadius: Math.round(canvas.width * 0.04), boxShadow: `0 0 24px ${caption.accent}22`, pointerEvents: 'none'}} />
-      <TopScrim strength={0.35} />
-      <div style={{position: 'absolute', top: margin * 1.4, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.width * 0.045), fontWeight: 800, color: '#fff', textShadow: `0 0 14px ${caption.accent}`}}>
-        {meta?.badge ?? 'CLIP'}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: faceH,
+          overflow: 'hidden',
+          background: '#05060a',
+        }}
+      >
+        <FocusMedia
+          props={props}
+          focus={face}
+          zoom={2.2}
+          width={canvas.width}
+          height={faceH}
+          style={{position: 'absolute', inset: 0}}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, rgba(6,7,10,0.55), rgba(6,7,10,0) 45%, rgba(6,7,10,0.6))',
+          }}
+        />
+        <Pill
+          text="Face cam"
+          accent={caption.accent}
+          canvas={canvas}
+          style={{top: Math.round(faceH * 0.09), left: Math.round(canvas.width * 0.05)}}
+        />
+        <Badge
+          text={meta?.badge}
+          accent={caption.accent}
+          canvas={canvas}
+          top={Math.round(faceH * 0.16)}
+          align="center"
+          scale={0.9}
+        />
       </div>
-      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
-    </>
-  );
-};
-
-const GamingNeon: React.FC<LayoutProps> = ({props, time}) => {
-  const {canvas, caption, meta} = props;
-  const margin = Math.round(canvas.width * 0.06);
-  return (
-    <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', inset: margin, border: `3px solid ${caption.accent}`, boxShadow: `0 0 24px ${caption.accent}66, inset 0 0 24px ${caption.accent}33`, pointerEvents: 'none'}} />
-      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.24} zoom={4} top={margin * 1.5} left={margin * 1.5} />
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin * 1.5} right={margin * 1.5} />
+      <div
+        style={{
+          position: 'absolute',
+          top: faceH,
+          left: 0,
+          right: 0,
+          height: gameH,
+          overflow: 'hidden',
+        }}
+      >
+        <MainMedia props={props} style={{objectFit: 'cover'}} />
+        <CornerBrackets
+          accent={`${caption.accent}cc`}
+          inset={Math.round(canvas.width * 0.025)}
+          size={Math.round(canvas.width * 0.06)}
+        />
+        <Pill
+          text="Gameplay"
+          accent={caption.accent}
+          canvas={canvas}
+          style={{top: Math.round(canvas.width * 0.05), right: Math.round(canvas.width * 0.05)}}
+        />
+      </div>
+      <NeonDivider top={faceH} accent={caption.accent} />
+      <div
+        style={{
+          position: 'absolute',
+          top: hudTop,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(180deg, rgba(6,7,10,0.94), #05060a)',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 2,
+            background: `linear-gradient(90deg, ${caption.accent}00, ${caption.accent}aa, ${caption.accent}00)`,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: Math.round(canvas.height * 0.015),
+            left: canvas.width * 0.05,
+            fontFamily: fontFamilyOf('inter'),
+            fontSize: Math.round(canvas.width * 0.024),
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.45)',
+          }}
+        >
+          Gameplay · 1080p
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            top: Math.round(canvas.height * 0.015),
+            right: canvas.width * 0.05,
+            fontFamily: fontFamilyOf('inter'),
+            fontSize: Math.round(canvas.width * 0.024),
+            letterSpacing: '0.16em',
+            color: 'rgba(255,255,255,0.45)',
+          }}
+        >
+          REC ●
+        </div>
+      </div>
       <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.008} />
     </>
   );
 };
 
-const GamingReaction: React.FC<LayoutProps> = ({props, time}) => {
+// PIP_OVERLAY: full-bleed gameplay with a floating circular webcam.
+const GamingPipOverlay: React.FC<LayoutProps> = ({props, time}) => {
   const {canvas, caption, meta} = props;
-  const margin = Math.round(canvas.width * 0.04);
-  const big = Math.round(canvas.width * 0.42);
-  const small = Math.round(canvas.width * 0.22);
-  return (
-    <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <TopScrim />
-      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.42} zoom={2.6} top={margin} left={margin} />
-      <div style={{position: 'absolute', bottom: margin, right: margin, width: small, height: Math.round(small * 0.75), borderRadius: small * 0.08, overflow: 'hidden', border: `3px solid ${caption.accent}`, boxShadow: '0 12px 30px rgba(0,0,0,0.5)'}}>
-        <FocusMedia props={props} focus={focusAt(props, time)} zoom={1.4} width={small} height={Math.round(small * 0.75)} style={{position: 'absolute', inset: 0}} />
-      </div>
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={margin + big * 0.05} right={margin} />
-      <ProgressBar accent={caption.accent} canvas={canvas} />
-    </>
-  );
-};
-
-const GamingSplit: React.FC<LayoutProps> = ({props, time}) => {
-  const {canvas, caption, meta} = props;
-  const half = Math.round(canvas.height * 0.5);
+  const margin = Math.round(canvas.width * 0.045);
+  const cam = Math.round(canvas.width * 0.3);
+  const ring = Math.max(6, Math.round(canvas.width * 0.012));
   const face = focusAt(props, time);
   return (
     <>
-      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: half, overflow: 'hidden'}}>
-        <MainMedia props={props} style={{objectFit: 'cover'}} />
-      </div>
-      <div style={{position: 'absolute', top: half, left: 0, right: 0, height: canvas.height - half, overflow: 'hidden', background: '#08090b'}}>
-        <FocusMedia props={props} focus={face} zoom={2.2} width={canvas.width} height={canvas.height - half} style={{position: 'absolute', inset: 0}} />
-      </div>
-      <div style={{position: 'absolute', top: half - 2, left: 0, right: 0, height: 4, background: caption.accent, boxShadow: `0 0 16px ${caption.accent}`}} />
-      <Badge text={meta?.badge} accent={caption.accent} canvas={canvas} top={canvas.height * 0.04} align="center" />
-      <ProgressBar accent={caption.accent} canvas={canvas} />
-    </>
-  );
-};
-
-// ---------- Gaming modern variants ----------
-
-const GamingGlass: React.FC<LayoutProps> = ({props, time}) => {
-  const {canvas, caption, meta} = props;
-  const margin = Math.round(canvas.width * 0.05);
-  const bubble = Math.round(canvas.width * 0.26);
-  return (
-    <>
       <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', inset: margin, borderRadius: Math.round(canvas.width * 0.05), border: `1px solid ${caption.accent}55`, boxShadow: `0 0 40px ${caption.accent}22, inset 0 0 40px ${caption.accent}11`, pointerEvents: 'none'}} />
-      <div style={{position: 'absolute', top: margin, left: margin, right: margin, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: margin}}>
-        <div style={{background: 'rgba(8,9,11,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: `1px solid ${caption.accent}44`, borderRadius: 999, padding: `${Math.round(margin * 0.35)}px ${Math.round(margin * 0.7)}px`, color: '#fff', fontSize: Math.round(canvas.width * 0.032), fontFamily: fontFamilyOf('inter'), letterSpacing: '0.08em'}}>
-          {meta?.badge ?? 'CLIP'}
-        </div>
-        <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.22} zoom={3.2} top={margin} left={canvas.width - bubble - margin} />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'linear-gradient(180deg, rgba(6,7,10,0.5), rgba(6,7,10,0) 26%, rgba(6,7,10,0) 76%, rgba(6,7,10,0.6))',
+        }}
+      />
+      <CornerBrackets
+        accent={`${caption.accent}aa`}
+        inset={margin}
+        size={Math.round(canvas.width * 0.07)}
+        thickness={4}
+      />
+      <Pill
+        text={meta?.badge ?? 'Live'}
+        accent={caption.accent}
+        canvas={canvas}
+        solid
+        style={{top: margin, left: margin}}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: margin,
+          right: margin,
+          width: cam + ring * 2,
+          height: cam + ring * 2,
+          borderRadius: '50%',
+          background: `linear-gradient(145deg, ${caption.accent}, rgba(6,7,10,0.9))`,
+          boxShadow: `0 22px 48px rgba(0,0,0,0.6), 0 0 30px ${caption.accent}55`,
+        }}
+      >
+        <FocusMedia
+          props={props}
+          focus={face}
+          zoom={2.4}
+          width={cam}
+          height={cam}
+          rounded={cam / 2}
+          style={{position: 'absolute', top: ring, left: ring}}
+        />
       </div>
-      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
-    </>
-  );
-};
-
-const GamingEsports: React.FC<LayoutProps> = ({props, time}) => {
-  const {canvas, caption, meta} = props;
-  const margin = Math.round(canvas.width * 0.04);
-  const barH = Math.round(canvas.height * 0.09);
-  return (
-    <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: barH, background: `linear-gradient(90deg, ${caption.accent}33, rgba(8,9,11,0.92) 40%, rgba(8,9,11,0.92) 60%, ${caption.accent}33)`, borderBottom: `2px solid ${caption.accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: fontFamilyOf('archivo_black')}}>
-        <div style={{color: '#fff', fontSize: Math.round(barH * 0.5), letterSpacing: '0.18em'}}>{meta?.badge ?? 'HIGHLIGHT'}</div>
-      </div>
-      <FaceBubble props={props} time={time} accent={caption.accent} sizeScale={0.24} zoom={3.6} top={barH + margin} left={margin} />
+      <Pill
+        text="Face cam"
+        accent={caption.accent}
+        canvas={canvas}
+        style={{top: margin + cam + ring * 2 + Math.round(canvas.width * 0.02), right: margin}}
+      />
       <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.007} />
     </>
   );
 };
 
-const GamingStream: React.FC<LayoutProps> = ({props, time}) => {
+// TRI_ZONE: facecam top, crosshair gameplay middle, killfeed HUD bottom.
+const GamingTriZone: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const camH = Math.round(canvas.height * 0.26);
+  const gameH = Math.round(canvas.height * 0.46);
+  const hudTop = camH + gameH;
+  const hudH = Math.round(canvas.height * 0.16);
+  const face = focusAt(props, time);
+  const cross = Math.max(12, Math.round(canvas.width * 0.02));
+  const feed = [0.42, 0.3];
+  return (
+    <>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: camH,
+          overflow: 'hidden',
+          background: '#05060a',
+        }}
+      >
+        <FocusMedia
+          props={props}
+          focus={face}
+          zoom={2.4}
+          width={canvas.width}
+          height={camH}
+          style={{position: 'absolute', inset: 0}}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, rgba(6,7,10,0.5), rgba(6,7,10,0) 55%, rgba(6,7,10,0.8))',
+          }}
+        />
+        <Pill
+          text="Cam 01"
+          accent={caption.accent}
+          canvas={canvas}
+          style={{top: Math.round(camH * 0.1), left: Math.round(canvas.width * 0.05)}}
+        />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          top: camH,
+          left: 0,
+          right: 0,
+          height: gameH,
+          overflow: 'hidden',
+        }}
+      >
+        <MainMedia props={props} style={{objectFit: 'cover'}} />
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: cross * 2,
+            height: cross * 2,
+            transform: 'translate(-50%, -50%)',
+            borderRadius: '50%',
+            border: `2px solid ${caption.accent}cc`,
+            boxShadow: `0 0 18px ${caption.accent}66`,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: 2,
+            height: cross * 2.4,
+            transform: 'translate(-50%, -50%)',
+            background: `${caption.accent}dd`,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: cross * 2.4,
+            height: 2,
+            transform: 'translate(-50%, -50%)',
+            background: `${caption.accent}dd`,
+          }}
+        />
+        <CornerBrackets
+          accent={`${caption.accent}cc`}
+          inset={Math.round(canvas.width * 0.025)}
+          size={Math.round(canvas.width * 0.055)}
+        />
+        <Pill
+          text={meta?.badge ?? 'Clutch'}
+          accent={caption.accent}
+          canvas={canvas}
+          solid
+          style={{top: Math.round(canvas.width * 0.04), left: Math.round(canvas.width * 0.05)}}
+        />
+      </div>
+      <NeonDivider top={camH} accent={caption.accent} />
+      <NeonDivider top={hudTop} accent={caption.accent} height={2} glow={12} />
+      <div
+        style={{
+          position: 'absolute',
+          top: hudTop,
+          left: 0,
+          right: 0,
+          height: hudH,
+          overflow: 'hidden',
+          background: '#05060a',
+        }}
+      >
+        <Pill
+          text="Killfeed"
+          accent={caption.accent}
+          canvas={canvas}
+          style={{top: Math.round(hudH * 0.12), left: Math.round(canvas.width * 0.05)}}
+        />
+        {feed.map((width, index) => (
+          <div
+            key={index}
+            style={{
+              position: 'absolute',
+              top: Math.round(hudH * (0.12 + index * 0.16)),
+              left: Math.round(canvas.width * 0.32),
+              width: Math.round(canvas.width * width * 0.55),
+              height: Math.max(5, Math.round(canvas.height * 0.004)),
+              borderRadius: 999,
+              background: `linear-gradient(90deg, ${caption.accent}dd, ${caption.accent}11)`,
+            }}
+          />
+        ))}
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.007} />
+    </>
+  );
+};
+
+// CINEMATIC_BLUR: 16:9 gameplay in the middle, blurred backdrop top and bottom.
+const GamingCinematicBlur: React.FC<LayoutProps> = ({props, time}) => {
+  const {canvas, caption, meta} = props;
+  const videoH = Math.round(Math.min(canvas.height * 0.62, (canvas.width * 9) / 16));
+  const videoTop = Math.round((canvas.height - videoH) / 2);
+  const pillTop = Math.max(
+    Math.round(canvas.height * 0.04),
+    videoTop - Math.round(canvas.height * 0.09),
+  );
+  return (
+    <>
+      <div style={{position: 'absolute', inset: 0, transform: 'scale(1.14)'}}>
+        <MainMedia
+          props={props}
+          style={{
+            objectFit: 'cover',
+            filter: 'blur(38px) saturate(1.25) brightness(0.5)',
+          }}
+        />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse at center, rgba(6,7,10,0) 36%, rgba(6,7,10,0.62) 100%)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: videoTop,
+          left: 0,
+          right: 0,
+          height: videoH,
+          overflow: 'hidden',
+          boxShadow: '0 28px 64px rgba(0,0,0,0.72)',
+        }}
+      >
+        <MainMedia props={props} style={{objectFit: 'cover'}} />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            border: `1px solid ${caption.accent}55`,
+            boxShadow: 'inset 0 0 80px rgba(0,0,0,0.6)',
+          }}
+        />
+      </div>
+      <Pill
+        text={meta?.badge ?? 'Cinematic'}
+        accent={caption.accent}
+        canvas={canvas}
+        solid
+        style={{top: pillTop, left: Math.round(canvas.width * 0.05)}}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: pillTop + Math.round(canvas.height * 0.005),
+          right: Math.round(canvas.width * 0.05),
+          fontFamily: fontFamilyOf('inter'),
+          fontSize: Math.round(canvas.width * 0.024),
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.55)',
+        }}
+      >
+        16:9 · Cinematic
+      </div>
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
+    </>
+  );
+};
+
+// DUO_VERSUS: two facecams on top (P1 vs P2), gameplay below.
+const GamingDuoVersus: React.FC<LayoutProps> = ({props, time}) => {
   const {canvas, caption, meta} = props;
   const margin = Math.round(canvas.width * 0.04);
-  const bubble = Math.round(canvas.width * 0.24);
-  return (
-    <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <TopScrim strength={0.5} />
-      <div style={{position: 'absolute', bottom: margin, left: margin, width: bubble, height: Math.round(bubble * 0.75), borderRadius: Math.round(bubble * 0.12), overflow: 'hidden', border: `2px solid ${caption.accent}`, boxShadow: `0 12px 32px rgba(0,0,0,0.6), 0 0 18px ${caption.accent}44`}}>
-        <FocusMedia props={props} focus={focusAt(props, time)} zoom={2.6} width={bubble} height={Math.round(bubble * 0.75)} style={{position: 'absolute', inset: 0}} />
-      </div>
-      <div style={{position: 'absolute', bottom: margin, left: margin + bubble + margin * 0.6, right: margin, background: 'rgba(8,9,11,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: `1px solid ${caption.accent}33`, borderRadius: Math.round(canvas.width * 0.03), padding: `${Math.round(margin * 0.5)}px ${Math.round(margin * 0.7)}px`}}>
-        <div style={{color: caption.accent, fontSize: Math.round(canvas.width * 0.03), fontFamily: fontFamilyOf('inter'), fontWeight: 700, letterSpacing: '0.06em'}}>{meta?.badge ?? 'LIVE'}</div>
-      </div>
-      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.005} />
-    </>
-  );
-};
-
-const GamingMinimalNeon: React.FC<LayoutProps> = ({props}) => {
-  const {canvas, caption, meta} = props;
-  const margin = Math.round(canvas.width * 0.06);
-  return (
-    <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', inset: margin, border: `2px solid ${caption.accent}`, borderRadius: Math.round(canvas.width * 0.04), boxShadow: `0 0 30px ${caption.accent}55, inset 0 0 20px ${caption.accent}22`, pointerEvents: 'none'}} />
-      <div style={{position: 'absolute', top: margin * 1.4, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.width * 0.045), fontWeight: 800, color: '#fff', textShadow: `0 0 16px ${caption.accent}`}}>
-        {meta?.badge ?? 'CLIP'}
-      </div>
-      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.008} />
-    </>
-  );
-};
-
-const GamingCinematic: React.FC<LayoutProps> = ({props}) => {
-  const {canvas, caption, meta} = props;
-  const bar = Math.round(canvas.height * 0.12);
-  return (
-    <>
-      <MainMedia props={props} style={{objectFit: 'cover'}} />
-      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: bar, background: 'linear-gradient(180deg, rgba(0,0,0,0.85), transparent)'}} />
-      <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, height: bar, background: 'linear-gradient(0deg, rgba(0,0,0,0.85), transparent)'}} />
-      <div style={{position: 'absolute', top: bar * 0.35, left: 0, right: 0, textAlign: 'center', fontFamily: fontFamilyOf('archivo_black'), fontSize: Math.round(canvas.width * 0.07), color: '#fff', letterSpacing: '0.12em', textShadow: `0 0 24px ${caption.accent}`}}>
-        {meta?.badge ?? 'HIGHLIGHT'}
-      </div>
-      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
-    </>
-  );
-};
-
-const GamingVerticalStack: React.FC<LayoutProps> = ({props, time}) => {
-  const {canvas, caption, meta} = props;
-  const half = Math.round(canvas.height * 0.5);
+  const gap = Math.round(canvas.width * 0.03);
+  const camH = Math.round(canvas.height * 0.3);
+  const camW = Math.round((canvas.width - margin * 2 - gap) / 2);
+  const radius = Math.round(canvas.width * 0.03);
+  const gameTop = margin + camH + Math.round(canvas.height * 0.025);
+  const gameBottom = canvas.height - Math.round(canvas.height * 0.12);
   const face = focusAt(props, time);
+  const leftFocus = {x: Math.max(0.05, face.x - 0.1), y: face.y};
+  const rightFocus = {x: Math.min(0.95, face.x + 0.1), y: face.y};
+  const vs = Math.round(canvas.width * 0.11);
   return (
     <>
-      <div style={{position: 'absolute', top: 0, left: 0, right: 0, height: half, overflow: 'hidden'}}>
+      <div style={{position: 'absolute', inset: 0, background: '#05060a'}} />
+      <CamPanel
+        props={props}
+        focus={leftFocus}
+        zoom={2.8}
+        width={camW}
+        height={camH}
+        radius={radius}
+        accent={caption.accent}
+        style={{top: margin, left: margin}}
+      />
+      <CamPanel
+        props={props}
+        focus={rightFocus}
+        zoom={2.8}
+        width={camW}
+        height={camH}
+        radius={radius}
+        accent={caption.accent}
+        style={{top: margin, right: margin}}
+      />
+      <Pill
+        text="P1"
+        accent={caption.accent}
+        canvas={canvas}
+        solid
+        style={{top: margin + Math.round(camH * 0.08), left: margin + Math.round(camW * 0.08)}}
+      />
+      <Pill
+        text="P2"
+        accent={caption.accent}
+        canvas={canvas}
+        solid
+        style={{
+          top: margin + Math.round(camH * 0.08),
+          right: margin + Math.round(camW * 0.08),
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: margin + Math.round(camH / 2 - vs / 2),
+          left: Math.round((canvas.width - vs) / 2),
+          width: vs,
+          height: vs,
+          borderRadius: '50%',
+          background: caption.accent,
+          color: '#06070a',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: fontFamilyOf('archivo_black'),
+          fontSize: Math.round(vs * 0.34),
+          letterSpacing: '0.02em',
+          transform: 'rotate(-6deg)',
+          boxShadow: `0 0 28px ${caption.accent}88`,
+        }}
+      >
+        VS
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          top: gameTop,
+          left: 0,
+          right: 0,
+          height: Math.max(1, gameBottom - gameTop),
+          overflow: 'hidden',
+        }}
+      >
         <MainMedia props={props} style={{objectFit: 'cover'}} />
+        <NeonDivider top={0} accent={caption.accent} height={3} glow={16} />
+        <CornerBrackets
+          accent={`${caption.accent}cc`}
+          inset={Math.round(canvas.width * 0.025)}
+          size={Math.round(canvas.width * 0.055)}
+        />
+        <Pill
+          text={meta?.badge ?? 'Duo'}
+          accent={caption.accent}
+          canvas={canvas}
+          style={{top: Math.round(canvas.width * 0.04), left: Math.round(canvas.width * 0.05)}}
+        />
       </div>
-      <div style={{position: 'absolute', top: half, left: 0, right: 0, height: canvas.height - half, overflow: 'hidden', background: '#05060a'}}>
-        <FocusMedia props={props} focus={face} zoom={2.4} width={canvas.width} height={canvas.height - half} style={{position: 'absolute', inset: 0}} />
-      </div>
-      <div style={{position: 'absolute', top: half - 2, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, transparent, ${caption.accent}, transparent)`, boxShadow: `0 0 18px ${caption.accent}`}} />
-      <div style={{position: 'absolute', top: half * 0.08, left: canvas.width * 0.06, fontFamily: fontFamilyOf('inter'), fontSize: Math.round(canvas.width * 0.04), fontWeight: 800, color: '#fff', textShadow: `0 0 12px ${caption.accent}`}}>
-        {meta?.badge ?? 'CLIP'}
-      </div>
-      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.006} />
+      <ProgressBar accent={caption.accent} canvas={canvas} heightScale={0.007} />
     </>
   );
 };
-
 // ---------- Football variants ----------
 
 const FootballScoreboardBottom: React.FC<LayoutProps> = ({props}) => {
@@ -1047,32 +1460,16 @@ const CustomOverlay: React.FC<LayoutProps> = ({props}) => {
 
 export const ClipLayout: React.FC<LayoutProps> = ({props, time}) => {
   switch (props.layout) {
-    case 'gaming_hud':
-      return <GamingHud props={props} time={time} />;
-    case 'gaming_hud_left':
-      return <GamingHudLeft props={props} time={time} />;
-    case 'gaming_hud_top':
-      return <GamingHudTop props={props} time={time} />;
-    case 'gaming_minimal':
-      return <GamingMinimal props={props} time={time} />;
-    case 'gaming_neon':
-      return <GamingNeon props={props} time={time} />;
-    case 'gaming_reaction':
-      return <GamingReaction props={props} time={time} />;
-    case 'gaming_split':
-      return <GamingSplit props={props} time={time} />;
-    case 'gaming_glass':
-      return <GamingGlass props={props} time={time} />;
-    case 'gaming_esports':
-      return <GamingEsports props={props} time={time} />;
-    case 'gaming_stream':
-      return <GamingStream props={props} time={time} />;
-    case 'gaming_minimal_neon':
-      return <GamingMinimalNeon props={props} time={time} />;
-    case 'gaming_cinematic':
-      return <GamingCinematic props={props} time={time} />;
-    case 'gaming_vertical_stack':
-      return <GamingVerticalStack props={props} time={time} />;
+    case 'gaming_classic_split':
+      return <GamingClassicSplit props={props} time={time} />;
+    case 'gaming_pip_overlay':
+      return <GamingPipOverlay props={props} time={time} />;
+    case 'gaming_tri_zone':
+      return <GamingTriZone props={props} time={time} />;
+    case 'gaming_cinematic_blur':
+      return <GamingCinematicBlur props={props} time={time} />;
+    case 'gaming_duo_versus':
+      return <GamingDuoVersus props={props} time={time} />;
     case 'football_scoreboard':
       return <FootballScoreboard props={props} time={time} />;
     case 'football_scoreboard_bottom':

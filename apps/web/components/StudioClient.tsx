@@ -101,18 +101,22 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   // and badge suggestions are relevant.
   const effectiveNiche = useMemo(() => {
     if (niche !== "generic") return niche;
-    switch (selectedClip?.video_template) {
-      case "gaming_hud":
-        return "gaming";
-      case "football_scoreboard":
-        return "football";
-      case "duo_split":
-        return "podcast";
-      case "lower_third":
-        return "education";
-      default:
-        return "generic";
-    }
+    const template = selectedClip?.video_template || "";
+    if (template.startsWith("gaming_")) return "gaming";
+    if (template.startsWith("football_")) return "football";
+    if (
+      template.startsWith("podcast_") ||
+      template === "duo_split" ||
+      template === "duo_split_horizontal"
+    )
+      return "podcast";
+    if (
+      template.startsWith("education_") ||
+      template === "lower_third" ||
+      template === "lower_third_top"
+    )
+      return "education";
+    return "generic";
   }, [niche, selectedClip?.video_template]);
   const nichePreset = useMemo(
     () => niches.find((item) => item.id === effectiveNiche) || null,
