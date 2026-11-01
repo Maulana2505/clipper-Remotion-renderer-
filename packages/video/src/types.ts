@@ -21,6 +21,18 @@ export type CropSettings = {
   zoom: number;
 };
 
+/** One overlay bubble in the custom_overlay layout. */
+export type OverlaySettings = {
+  id?: string;
+  shape: 'circle' | 'rounded' | 'square';
+  /** Normalised centre of the bubble on the canvas. */
+  x: number;
+  y: number;
+  /** Width as a fraction of the canvas width. */
+  size: number;
+  crop: CropSettings;
+};
+
 export type LayoutId =
   // Legacy templates
   | 'auto_crop'
@@ -69,7 +81,8 @@ export type LayoutId =
   | 'center_focus'
   | 'full_bleed_text'
   | 'framed_minimal'
-  | 'cinematic_bars';
+  | 'cinematic_bars'
+  | 'custom_overlay';
 
 export type CaptionId =
   | 'none'
@@ -137,6 +150,7 @@ export type ClipProps = {
   media?: MediaSpec;
   layout: LayoutId;
   crop?: CropSettings;
+  overlays?: OverlaySettings[];
   caption: {template: CaptionId; font: FontId; accent: string; enabled: boolean};
   words: Word[];
   face?: {keyframes: FaceKeyframe[]};

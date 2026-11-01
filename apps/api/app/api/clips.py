@@ -147,6 +147,9 @@ def update_clip(clip_id: str, payload: ClipPatch):
     if payload.crop is not None:
         updates.append("crop_json = ?")
         params.append(json.dumps(payload.crop.model_dump(), ensure_ascii=False))
+    if payload.overlays is not None:
+        updates.append("overlays_json = ?")
+        params.append(json.dumps([o.model_dump() for o in payload.overlays], ensure_ascii=False))
 
     if not updates:
         return get_clip(clip_id)

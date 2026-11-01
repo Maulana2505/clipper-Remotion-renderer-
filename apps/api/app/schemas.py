@@ -40,6 +40,17 @@ class CropSettings(BaseModel):
     zoom: float = Field(default=1.0, ge=1.0, le=4.0)
 
 
+class OverlaySettings(BaseModel):
+    """One facecam/overlay bubble in the custom_overlay layout."""
+
+    id: str | None = None
+    shape: Literal["circle", "rounded", "square"] = "circle"
+    x: float = Field(default=0.5, ge=0.0, le=1.0)
+    y: float = Field(default=0.5, ge=0.0, le=1.0)
+    size: float = Field(default=0.26, ge=0.05, le=0.8)
+    crop: CropSettings = Field(default_factory=CropSettings)
+
+
 class RedetectRequest(BaseModel):
     """How to apply transcript-aware clip detection to an existing job."""
 
@@ -84,6 +95,7 @@ class ClipPatch(BaseModel):
     badge: str | None = None
     meta: JobMeta | None = None
     crop: CropSettings | None = None
+    overlays: list[OverlaySettings] | None = None
 
 
 class RenderRequest(BaseModel):

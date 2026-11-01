@@ -3,7 +3,7 @@ import {spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {ClipMeta, ClipProps, CanvasSpec} from '../types';
 import {safeAreaOf} from '../types';
 import {fontFamilyOf} from '../fonts';
-import {FocusMedia, MainMedia, focusAt} from '../media';
+import {FocusMedia, MainMedia, OverlayBubble, focusAt} from '../media';
 
 type LayoutProps = {
   props: ClipProps;
@@ -1032,6 +1032,19 @@ const CinematicBars: React.FC<LayoutProps> = ({props}) => {
   );
 };
 
+const CustomOverlay: React.FC<LayoutProps> = ({props}) => {
+  const {canvas, overlays} = props;
+  return (
+    <>
+      <MainMedia props={props} style={{objectFit: 'cover'}} />
+      <TopScrim strength={0.25} />
+      {(overlays || []).map((overlay) => (
+        <OverlayBubble key={overlay.id || (overlay.x + '-' + overlay.y)} props={props} overlay={overlay} />
+      ))}
+    </>
+  );
+};
+
 export const ClipLayout: React.FC<LayoutProps> = ({props, time}) => {
   switch (props.layout) {
     case 'gaming_hud':
@@ -1106,6 +1119,8 @@ export const ClipLayout: React.FC<LayoutProps> = ({props, time}) => {
       return <FramedMinimal props={props} time={time} />;
     case 'cinematic_bars':
       return <CinematicBars props={props} time={time} />;
+    case 'custom_overlay':
+      return <CustomOverlay props={props} time={time} />;
     default:
       return <LegacyLayout props={props} time={time} />;
   }

@@ -37,6 +37,7 @@ import {
   type FontPreset,
   type Job,
   type NichePreset,
+  type OverlaySettings,
   type Render,
   type TemplateItem,
 } from "@/lib/api";
@@ -524,6 +525,7 @@ export default function StudioClient({ jobId }: { jobId: string }) {
                     badge={selectedClip.badge}
                     meta={clipMeta}
                     crop={previewCrop}
+                    overlays={selectedClip.overlays}
                     cropMode={tab === "crop"}
                     onCropChange={changeCrop}
                     analysisVersion={analysisVersion}
@@ -820,6 +822,9 @@ function StylePanel({
                 </div>
               </div>
             ))}
+            {clip.video_template === "custom_overlay" ? (
+              <OverlaysEditor overlays={clip.overlays || []} onChange={(next) => patchClip({ overlays: next })} />
+            ) : null}
           </div>
         ) : null}
 
@@ -1514,5 +1519,137 @@ function RenderPanel({ clip, renders }: { clip: Clip | null; renders: Render[] }
         </div>
       )}
     </section>
+  );
+}
+
+function OverlaysEditor({
+  overlays,
+  onChange,
+}: {
+  overlays: OverlaySettings[];
+  onChange: (next: OverlaySettings[]) => void;
+}) {
+  const list = overlays || [];
+
+  function update(id: string, patch: Partial<OverlaySettings>) {
+    onChange(list.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }
+
+  function add() {
+    onChange([
+      ...list,
+      {
+        id: (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ov_${Date.now()}`),
+        shape: "circle",
+        x: 0.5,
+        y: 0.5,
+        size: 0.26,
+        crop: { x: 0.5, y: 0.5, zoom: 1 },
+      },
+    ]);
+  }
+
+  function remove(id: string) {
+    onChange(list.filter((item) => item.id !== id));
+  }
+
+  return (
+    <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-white">Overlays (facecam boxes)</span>
+        <button
+          onClick={add}
+          className="rounded-lg border border-lime/25 bg-lime/10 px-2.5 py-1 text-[10px] font-semibold text-lime hover:bg-lime/15"
+        >
+          + Add
+        </button>
+      </div>
+      {list.length === 0 ? (
+        <p className="text-[10px] text-zinc-500">No overlays yet. Click Add.</p>
+      ) : null}
+      {list.map((overlay, index) => (
+        <div key={overlay.id || index} className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-zinc-400">Overlay {index + 1}</span>
+            <button
+              onClick={() => overlay.id && remove(overlay.id)}
+              className="text-[10px] text-red-300 hover:text-red-200"
+            >
+              Remove
+            </button>
+          </div>
+          <label className="block text-[10px] text-zinc-500">
+            Shape
+            <select
+              value={overlay.shape}
+              onChange={(event) =>
+                overlay.id && update(overlay.id, { shape: event.target.value as OverlaySettings["shape"] })
+              }
+              className="mt-1 w-full rounded-lg border border-white/10 bg-panel2 px-2 py-1.5 text-xs text-white"
+            >
+              <option value="circle">Circle</option>
+              <option value="rounded">Rounded</option>
+              <option value="square">Square</option>
+            </select>
+          </label>
+          {(
+            [
+              { key: "size", label: "Size", min: 5, max: 80, step: 1, value: Math.round(overlay.size * 100) },
+              { key: "x", label: "Position X", min: 0, max: 100, step: 1, value: Math.round(overlay.x * 100) },
+              { key: "y", label: "Position Y", min: 0, max: 100, step: 1, value: Math.round(overlay.y * 100) },
+            ] as const
+          ).map((field) => (
+            <label key={field.key} className="block text-[10px] text-zinc-500">
+              {field.label}: {field.value}%
+              <input
+                type="range"
+                min={field.min}
+                max={field.max}
+                step={field.step}
+                value={field.value}
+                onChange={(event) => {
+                  if (!overlay.id) return;
+                  const next = Number(event.target.value) / 100;
+                  update(overlay.id, { [field.key]: next } as Partial<OverlaySettings>);
+                }}
+                className="mt-1 w-full accent-lime"
+              />
+            </label>
+          ))}
+          <div className="rounded-lg border border-white/5 bg-black/30 p-2">
+            <div className="mb-1 text-[10px] font-medium text-zinc-400">Crop</div>
+            {(
+              [
+                { key: "x", label: "X", min: 0, max: 100, value: Math.round(overlay.crop.x * 100) },
+                { key: "y", label: "Y", min: 0, max: 100, value: Math.round(overlay.crop.y * 100) },
+                { key: "zoom", label: "Zoom", min: 100, max: 400, value: Math.round(overlay.crop.zoom * 100) },
+              ] as const
+            ).map((field) => (
+              <label key={field.key} className="block text-[10px] text-zinc-500">
+                {field.label}: {field.value}{field.key === "zoom" ? "%" : "%"}
+                <input
+                  type="range"
+                  min={field.min}
+                  max={field.max}
+                  step={1}
+                  value={field.value}
+                  onChange={(event) => {
+                    if (!overlay.id) return;
+                    const next =
+                      field.key === "zoom"
+                        ? Number(event.target.value) / 100
+                        : Number(event.target.value) / 100;
+                    update(overlay.id, {
+                      crop: { ...overlay.crop, [field.key]: next },
+                    });
+                  }}
+                  className="mt-1 w-full accent-lime"
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

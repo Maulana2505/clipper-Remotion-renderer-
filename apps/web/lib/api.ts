@@ -44,6 +44,15 @@ export interface CropSettings {
   zoom: number;
 }
 
+export interface OverlaySettings {
+  id?: string;
+  shape: "circle" | "rounded" | "square";
+  x: number;
+  y: number;
+  size: number;
+  crop: CropSettings;
+}
+
 export interface Clip {
   id: string;
   job_id: string;
@@ -63,6 +72,7 @@ export interface Clip {
   accent?: string | null;
   meta?: ClipMeta | null;
   crop?: CropSettings | null;
+  overlays?: OverlaySettings[] | null;
   face_track_path?: string | null;
   created_at: string;
 }

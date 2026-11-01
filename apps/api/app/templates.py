@@ -114,6 +114,7 @@ VIDEO_TEMPLATES: list[dict] = [
     {"id": "full_bleed_text", "name": "Full Bleed Text", "description": "Text overlay on full video", "requires_face_track": False, "niche": "generic"},
     {"id": "framed_minimal", "name": "Framed Minimal", "description": "Padded frame with border", "requires_face_track": False, "niche": "generic"},
     {"id": "cinematic_bars", "name": "Cinematic Bars", "description": "Letterbox + vignette", "requires_face_track": False, "niche": "generic"},
+    {"id": "custom_overlay", "name": "Custom Overlay", "description": "Multiple facecam boxes/circles with per-overlay crop", "requires_face_track": False, "niche": "generic"},
 ]
 
 CAPTION_TEMPLATES: list[dict] = [

@@ -1,6 +1,6 @@
 import React from 'react';
 import {Img, Video, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import type {ClipProps, CropSettings, FaceKeyframe} from './types';
+import type {ClipProps, CropSettings, FaceKeyframe, OverlaySettings} from './types';
 
 const MAX_ZOOM = 4;
 
@@ -189,6 +189,72 @@ export const FocusMedia: React.FC<{
     width: displayWidth,
     height: displayHeight,
     maxWidth: 'none',
+  };
+
+  return (
+    <div style={shell}>
+      {framesMode && frames ? (
+        <Img src={frameSrc(frames.mainPrefix, frame, frames.extension, frames.digits)} style={inner} />
+      ) : (
+        <Video
+          src={resolveSrc(props.source.url)}
+          startFrom={Math.round(props.clip.start * fps)}
+          endAt={Math.round(props.clip.end * fps)}
+          muted
+          style={inner}
+        />
+      )}
+    </div>
+  );
+};
+
+/**
+ * OverlayBubble for custom_overlay layout: a single facecam box/circle with its
+ * own crop and size.
+ */
+export const OverlayBubble: React.FC<{
+  props: ClipProps;
+  overlay: OverlaySettings;
+}> = ({props, overlay}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const frames = props.media?.frames;
+  const framesMode = useIsFramesMode(props);
+  const crop = normalizeCrop(overlay.crop);
+  const width = Math.round(props.canvas.width * overlay.size);
+  const height = Math.round(width * 0.75);
+  const left = Math.round(props.canvas.width * overlay.x - width / 2);
+  const top = Math.round(props.canvas.height * overlay.y - height / 2);
+  const radius =
+    overlay.shape === 'circle'
+      ? width / 2
+      : overlay.shape === 'rounded'
+      ? Math.round(width * 0.12)
+      : 0;
+
+  const shell: React.CSSProperties = {
+    position: 'absolute',
+    left,
+    top,
+    width,
+    height,
+    overflow: 'hidden',
+    borderRadius: radius,
+    border: '2px solid rgba(255,255,255,0.6)',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+    backgroundColor: '#000',
+  };
+
+  const coverScale = Math.max(width / props.source.width, height / props.source.height);
+  const totalZoom = Math.max(1, crop.zoom);
+  const displayWidth = props.source.width * coverScale * totalZoom;
+  const displayHeight = props.source.height * coverScale * totalZoom;
+  const inner: React.CSSProperties = {
+    position: 'absolute',
+    left: Math.min(0, Math.max(width - displayWidth, -(crop.x * displayWidth - width / 2))),
+    top: Math.min(0, Math.max(height - displayHeight, -(crop.y * displayHeight - height / 2))),
+    width: displayWidth,
+    height: displayHeight,
   };
 
   return (

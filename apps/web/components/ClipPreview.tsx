@@ -11,6 +11,7 @@ import {
   type CropSettings,
   type FontId,
   type LayoutId,
+  type OverlaySettings,
   type Word,
 } from "@clipper/video";
 import { api, apiUrl, type CanvasPreset, type Clip, type Job } from "@/lib/api";
@@ -32,6 +33,7 @@ type Props = {
   badge?: string | null;
   meta?: ClipMeta;
   crop?: CropSettings | null;
+  overlays?: OverlaySettings[] | null;
   cropMode?: boolean;
   onCropChange?: (crop: CropSettings) => void;
   /** Re-fetch the transcript/face track after they are generated on demand. */
@@ -54,6 +56,7 @@ export default function ClipPreview({
   badge = null,
   meta,
   crop = null,
+  overlays = null,
   cropMode = false,
   onCropChange,
   analysisVersion = 0,
@@ -128,6 +131,7 @@ export default function ClipPreview({
       media: { mode: "video" },
       layout: videoTemplate as LayoutId,
       crop: activeCrop,
+      overlays: overlays ?? [],
       caption: {
         template: (captionTemplate as CaptionId) || "plain_white",
         font: (fontPreset as FontId) || "anton",
@@ -156,6 +160,7 @@ export default function ClipPreview({
       badge,
       meta,
       activeCrop,
+      overlays,
     ],
   );
 
