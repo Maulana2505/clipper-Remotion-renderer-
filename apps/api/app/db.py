@@ -99,6 +99,7 @@ MIGRATIONS: list[tuple[str, str, str]] = [
     ("jobs", "source_start", "REAL"),
     ("jobs", "source_end", "REAL"),
     ("jobs", "meta_json", "TEXT"),
+    ("jobs", "transcript_scope", "TEXT"),
     ("clips", "face_track_path", "TEXT"),
     ("clips", "crop_json", "TEXT"),
     ("clips", "overlays_json", "TEXT"),

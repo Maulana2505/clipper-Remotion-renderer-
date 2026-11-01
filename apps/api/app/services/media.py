@@ -215,6 +215,24 @@ def probe_media(path: Path) -> dict:
     }
 
 
+def extract_audio_segment(source: Path, destination: Path, start: float, duration: float) -> Path:
+    """Extract a single ``[start, start+duration]`` window as 16 kHz mono WAV."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        FFMPEG, "-hide_banner", "-y",
+        "-ss", f"{max(0.0, start):.3f}",
+        "-i", str(source),
+        "-t", f"{max(0.1, duration):.3f}",
+        "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
+        str(destination),
+    ]
+    result = run(cmd, timeout=60 * 10)
+    if result.returncode != 0 or not destination.exists():
+        message = (result.stderr or "").strip().splitlines()
+        raise MediaError(message[-1] if message else "ffmpeg could not extract audio segment.")
+    return destination
+
+
 def extract_audio(source: Path, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     cmd = [

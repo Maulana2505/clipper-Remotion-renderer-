@@ -77,6 +77,7 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
   const [analysisVersion, setAnalysisVersion] = useState(0);
   const [hasTranscript, setHasTranscript] = useState(false);
+  const [transcriptScope, setTranscriptScope] = useState<"clips" | "full">("clips");
   const [transcriptBusy, setTranscriptBusy] = useState(false);
   const [redetectBusy, setRedetectBusy] = useState(false);
   const [redetectMode, setRedetectMode] = useState<"merge" | "replace">("merge");
@@ -142,8 +143,12 @@ export default function StudioClient({ jobId }: { jobId: string }) {
 
   // Transcript exists? Checked once when the job opens.
   useEffect(() => {
-    api(`/api/jobs/${jobId}/transcript`)
-      .then(() => setHasTranscript(true))
+    api<{ scope?: string }>(`/api/jobs/${jobId}/transcript`)
+      .then((data) => {
+        setHasTranscript(true);
+        if (data?.scope === "full") setTranscriptScope("full");
+        else setTranscriptScope("clips");
+      })
       .catch(() => setHasTranscript(false));
   }, [jobId]);
 
@@ -151,8 +156,10 @@ export default function StudioClient({ jobId }: { jobId: string }) {
     if (!transcriptBusy) return;
     const timer = setInterval(async () => {
       try {
-        await api(`/api/jobs/${jobId}/transcript`);
+        const data = await api<{ scope?: string }>(`/api/jobs/${jobId}/transcript`);
         setHasTranscript(true);
+        if (data?.scope === "full") setTranscriptScope("full");
+        else setTranscriptScope("clips");
         setTranscriptBusy(false);
         setAnalysisVersion((value) => value + 1);
         setNotice("Transcript ready — captions can be enabled now.");
@@ -384,13 +391,17 @@ export default function StudioClient({ jobId }: { jobId: string }) {
     changeOverlays(next);
   }
 
-  async function generateTranscript() {
+  async function generateTranscript(scope: "clips" | "full" = "clips") {
     if (!selectedClip || transcriptBusy) return;
     setTranscriptBusy(true);
     setError(null);
     try {
-      await api(`/api/jobs/${jobId}/transcript`, { method: "POST" });
-      setNotice("Transcribing in the background…");
+      await api(`/api/jobs/${jobId}/transcript?scope=${scope}`, { method: "POST" });
+      setNotice(
+        scope === "clips"
+          ? "Transcribing clip captions in the background…"
+          : "Transcribing the full video in the background…"
+      );
     } catch (err) {
       setTranscriptBusy(false);
       setError(err instanceof Error ? err.message : "Could not start transcription.");
@@ -628,6 +639,7 @@ export default function StudioClient({ jobId }: { jobId: string }) {
               overlayMode={overlayMode}
               onOverlayModeChange={setOverlayMode}
               hasTranscript={hasTranscript}
+              transcriptScope={transcriptScope}
               transcriptBusy={transcriptBusy}
               onGenerateTranscript={generateTranscript}
               faceBusy={faceBusy}
@@ -742,6 +754,7 @@ function StylePanel({
   overlayMode,
   onOverlayModeChange,
   hasTranscript,
+  transcriptScope,
   transcriptBusy,
   onGenerateTranscript,
   faceBusy,
@@ -768,8 +781,9 @@ function StylePanel({
   overlayMode: "move" | "pan";
   onOverlayModeChange: (mode: "move" | "pan") => void;
   hasTranscript: boolean;
+  transcriptScope: "clips" | "full";
   transcriptBusy: boolean;
-  onGenerateTranscript: () => void;
+  onGenerateTranscript: (scope?: "clips" | "full") => void;
   faceBusy: boolean;
   faceReady: boolean;
   onGenerateFaceTrack: () => void;
@@ -972,14 +986,32 @@ function StylePanel({
                 <p className="mt-1 text-[10px] leading-relaxed text-amber-200/70">
                   Captions stay empty until a transcript exists. Transcription is opt-in and runs locally.
                 </p>
-                <button
-                  onClick={onGenerateTranscript}
-                  disabled={transcriptBusy}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-[11px] font-semibold text-amber-100 hover:bg-amber-300/15 disabled:opacity-50"
-                >
-                  {transcriptBusy ? <Loader2 size={12} className="animate-spin" /> : <Captions size={12} />}
-                  {transcriptBusy ? "Transcribing…" : "Generate transcript"}
-                </button>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => onGenerateTranscript("clips")}
+                    disabled={transcriptBusy}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-[11px] font-semibold text-amber-100 hover:bg-amber-300/15 disabled:opacity-50"
+                  >
+                    {transcriptBusy ? <Loader2 size={12} className="animate-spin" /> : <Captions size={12} />}
+                    {transcriptBusy ? "…" : "Transkrip klip"}
+                  </button>
+                  <button
+                    onClick={() => onGenerateTranscript("full")}
+                    disabled={transcriptBusy}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] font-medium text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+                  >
+                    {transcriptBusy ? <Loader2 size={12} className="animate-spin" /> : <Captions size={12} />}
+                    {transcriptBusy ? "…" : "Transkrip penuh"}
+                  </button>
+                </div>
+                <p className="mt-1 text-[9px] leading-relaxed text-amber-200/60">
+                  "Transkrip klip" cepat (caption saja). "Transkrip penuh" untuk re-detect LLM.
+                </p>
+                {hasTranscript && transcriptScope === "clips" ? (
+                  <p className="mt-1 text-[9px] text-zinc-500">
+                    Transkrip saat ini: klip. Untuk re-detect lebih akurat, jalankan "Transkrip penuh".
+                  </p>
+                ) : null}
               </div>
             ) : null}
             <div className="mb-2 rounded-xl border border-white/10 bg-black/20 p-3">
