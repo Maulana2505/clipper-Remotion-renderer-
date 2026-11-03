@@ -19,5 +19,6 @@ Catatan:
 - PyAV harus `<19` (faster-whisper 1.1.1 memanggil `av.open(..., metadata_errors="ignore")`,
   yang dihapus di PyAV 19). Install cell sudah mem-pin `av>=12,<19`.
 - `worker.py` juga punya shim kompatibilitas, jadi kalau Colab memaksa PyAV 19+, tetap jalan.
-- Kalau muncul `TypeError: open() got an unexpected keyword argument 'metadata_errors'`,
-  jalankan ulang cell install (pastikan av < 19) lalu restart runtime.
+- cuBLAS/cuDNN: `os.environ['LD_LIBRARY_PATH']` di Python tidak berpengaruh ke proses yang sudah jalan.
+  Cell loader memakai `ldconfig` + preload `ctypes` agar `libcublas.so.12` ditemukan.
+- Kalau muncul `RuntimeError: Library libcublas.so.12 is not found`, jalankan ulang cell install + loader, lalu restart runtime.
