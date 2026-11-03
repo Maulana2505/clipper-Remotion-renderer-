@@ -16,5 +16,8 @@ Catatan:
 - Colab gratis bisa disconnect; jika worker mati, Clipper otomatis fallback ke Whisper lokal.
 - Model diunduh ulang tiap sesi (~1.5 GB). Cache ke Google Drive jika perlu.
 - Jangan bagikan URL + token.
+- PyAV harus `<19` (faster-whisper 1.1.1 memanggil `av.open(..., metadata_errors="ignore")`,
+  yang dihapus di PyAV 19). Install cell sudah mem-pin `av>=12,<19`.
+- `worker.py` juga punya shim kompatibilitas, jadi kalau Colab memaksa PyAV 19+, tetap jalan.
 - Kalau muncul `TypeError: open() got an unexpected keyword argument 'metadata_errors'`,
-  jalankan ulang cell install (upgrade PyAV >= 12) lalu restart runtime.
+  jalankan ulang cell install (pastikan av < 19) lalu restart runtime.

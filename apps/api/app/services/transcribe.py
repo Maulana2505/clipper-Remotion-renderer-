@@ -1,6 +1,17 @@
 from __future__ import annotations
 
 import os
+try:
+    import av, inspect
+    if "metadata_errors" not in inspect.signature(av.open).parameters:
+        _orig = av.open
+        def _open(*a, **kw):
+            for _k in ("metadata_errors", "metadata_encoding", "stream_options"):
+                kw.pop(_k, None)
+            return _orig(*a, **kw)
+        av.open = _open
+except Exception:  # noqa: BLE001
+    pass
 from pathlib import Path
 from typing import Any
 

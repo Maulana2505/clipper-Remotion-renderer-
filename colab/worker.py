@@ -8,10 +8,28 @@ Then expose via cloudflared:
 from __future__ import annotations
 
 import os
+import inspect
 import shutil
 import tempfile
 import traceback
 from pathlib import Path
+
+# Kompatibilitas PyAV: faster-whisper 1.1.1 memanggil av.open(..., metadata_errors="ignore"),
+# tetapi PyAV 19+ menghapus parameter tersebut. Buang kwarg yang tidak dikenal.
+try:
+    import av
+
+    if "metadata_errors" not in inspect.signature(av.open).parameters:
+        _orig_open = av.open
+
+        def _open_compat(*args, **kwargs):
+            for key in ("metadata_errors", "metadata_encoding", "stream_options"):
+                kwargs.pop(key, None)
+            return _orig_open(*args, **kwargs)
+
+        av.open = _open_compat
+except Exception:  # noqa: BLE001
+    pass
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
