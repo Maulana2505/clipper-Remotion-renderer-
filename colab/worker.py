@@ -16,10 +16,20 @@ from pathlib import Path
 
 # Kompatibilitas PyAV: faster-whisper 1.1.1 memanggil av.open(..., metadata_errors="ignore"),
 # tetapi PyAV 19+ menghapus parameter tersebut. Buang kwarg yang tidak dikenal.
+# Cek berdasarkan versi (bukan inspect.signature, karena av.open builtin tidak punya text signature).
 try:
     import av
 
-    if "metadata_errors" not in inspect.signature(av.open).parameters:
+    def _av_needs_patch() -> bool:
+        try:
+            return int(str(av.__version__).split(".")[0]) >= 19
+        except Exception:  # noqa: BLE001
+            try:
+                return "metadata_errors" not in __import__("inspect").signature(av.open).parameters
+            except (ValueError, TypeError):
+                return False
+
+    if _av_needs_patch():
         _orig_open = av.open
 
         def _open_compat(*args, **kwargs):
@@ -28,8 +38,9 @@ try:
             return _orig_open(*args, **kwargs)
 
         av.open = _open_compat
-except Exception:  # noqa: BLE001
-    pass
+        print("[worker] PyAV", av.__version__, "-> patched av.open (metadata_errors removed)", flush=True)
+except Exception as exc:  # noqa: BLE001
+    print("[worker] PyAV compat shim failed:", exc, flush=True)
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse

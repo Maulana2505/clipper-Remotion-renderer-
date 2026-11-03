@@ -2,8 +2,19 @@ from __future__ import annotations
 
 import os
 try:
-    import av, inspect
-    if "metadata_errors" not in inspect.signature(av.open).parameters:
+    import av
+
+    def _av_needs_patch() -> bool:
+        try:
+            return int(str(av.__version__).split(".")[0]) >= 19
+        except Exception:  # noqa: BLE001
+            try:
+                import inspect
+                return "metadata_errors" not in inspect.signature(av.open).parameters
+            except (ValueError, TypeError):
+                return False
+
+    if _av_needs_patch():
         _orig = av.open
         def _open(*a, **kw):
             for _k in ("metadata_errors", "metadata_encoding", "stream_options"):
