@@ -39,7 +39,12 @@ def probe_remote(url: str, token: str | None) -> tuple[bool, str]:
             return False, "Unauthorized: check the token."
         response.raise_for_status()
         data = response.json()
-        return True, f"OK: {data.get('model', '?')} on {data.get('device', '?')}"
+        loaded = "loaded" if data.get("model_loaded") else "not loaded"
+        cuda = "CUDA" if data.get("cuda_available") else "no CUDA"
+        msg = f"OK: {data.get('model', '?')} on {data.get('device', '?')} ({data.get('compute', '?')}, {loaded}, {cuda}, ctranslate2 {data.get('ctranslate2', '?')})"
+        if data.get("load_error"):
+            msg += f" | load_error: {str(data.get('load_error'))[:200]}"
+        return True, msg
     except Exception as exc:  # noqa: BLE001
         return False, f"Could not reach worker: {exc}"
 
@@ -59,9 +64,16 @@ def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any]) -
             "mode": params.get("mode", "balanced"),
             "hotwords": params.get("hotwords") or "",
         }
-        with httpx.Client(timeout=timeout) as client:
+        with httpx.Client(timeout=httpx.Timeout(connect=15.0, read=timeout, write=120.0, pool=15.0)) as client:
             response = client.post(f"{url}/transcribe", headers=headers, files=files, data=data)
-    response.raise_for_status()
+    if response.status_code >= 400:
+        detail = ""
+        try:
+            body = response.json()
+            detail = body.get("detail") or body.get("error") or str(body)
+        except Exception:
+            detail = (response.text or "").strip()[:500]
+        raise RuntimeError(f"Remote worker {response.status_code}: {detail}")
     payload = response.json()
     segments = payload.get("segments") or []
     # Apply offset if the worker returned relative times.
