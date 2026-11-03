@@ -189,6 +189,7 @@ def _run_transcribe(audio_path: Path, offset: float, duration: float) -> tuple[l
                     "language": cfg["language"],
                     "mode": cfg["mode"],
                     "hotwords": cfg["hotwords"],
+                    "_duration": duration,
                 },
             )
             return segments, f"whisper:remote:{cfg['model']}"

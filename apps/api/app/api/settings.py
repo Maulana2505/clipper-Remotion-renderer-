@@ -188,15 +188,8 @@ def test_whisper_settings(payload: WhisperSettingsUpdate):
         return {"ok": True, "message": "Local backend selected."}
     if not payload.remote_url:
         raise HTTPException(status_code=422, detail="Remote URL is required.")
-    token = payload.remote_token
-    if not token:
-        from ..db import get_conn, row_to_dict
-        from ..core.security import decrypt_secret
-        with get_conn() as conn:
-            row = row_to_dict(conn.execute("SELECT encrypted_remote_token FROM app_settings WHERE id = 1").fetchone())
-        token = decrypt_secret((row or {}).get("encrypted_remote_token"))
     from ..services.remote_whisper import probe_remote
-    ok, message = probe_remote(payload.remote_url, token)
+    ok, message = probe_remote(payload.remote_url, payload.remote_token)
     if not ok:
         raise HTTPException(status_code=400, detail=message)
     return {"ok": True, "message": message}
