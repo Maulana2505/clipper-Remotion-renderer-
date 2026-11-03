@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { HardDrive, Settings2, Sparkles } from "lucide-react";
+import { HardDrive, Loader2, Settings2, Sparkles } from "lucide-react";
 import SettingsDrawer from "@/components/SettingsDrawer";
 import { api, type StorageOverview } from "@/lib/api";
+import { useActivity, type ActivityItem } from "@/lib/useActivity";
+import { stageLabel } from "@/lib/stages";
 
 export default function AppHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [storage, setStorage] = useState<StorageOverview | null>(null);
+  const { items, busy } = useActivity();
 
   useEffect(() => {
     let active = true;
@@ -86,6 +90,34 @@ export default function AppHeader() {
           </div>
         </div>
       </header>
+      {busy && items.length > 0 ? (
+        <div className="border-b border-white/5 bg-ink/60 px-4 py-1.5 backdrop-blur-xl sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-[1600px] items-center gap-3">
+            <div className="relative h-1 w-24 overflow-hidden rounded-full bg-white/5">
+              <div
+                className="h-full rounded-full bg-lime transition-all"
+                style={{ width: `${Math.max(3, Math.max(...items.map((i) => i.progress)))}%` }}
+              />
+            </div>
+            <div className="flex flex-1 flex-wrap items-center gap-2">
+              {items.slice(0, 3).map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => item.href && router.push(item.href)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-lime/20 bg-lime/5 px-2.5 py-1 text-[10px] font-medium text-lime transition hover:bg-lime/10"
+                >
+                  <Loader2 size={10} className="animate-spin" />
+                  <span>{item.label}</span>
+                  <span className="opacity-70">{stageLabel(item.stage)} {item.progress}%</span>
+                </button>
+              ))}
+              {items.length > 3 ? (
+                <span className="text-[10px] text-zinc-500">+{items.length - 3} lagi</span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );

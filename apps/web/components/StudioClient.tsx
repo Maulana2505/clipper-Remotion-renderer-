@@ -41,6 +41,7 @@ import {
   type Render,
   type TemplateItem,
 } from "@/lib/api";
+import { stageLabel } from "@/lib/stages";
 
 type StyleTab = "video" | "canvas" | "crop" | "caption" | "font" | "brand";
 

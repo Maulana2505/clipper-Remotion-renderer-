@@ -115,7 +115,7 @@ def _mode_params(mode: str) -> dict[str, Any]:
     return {"beam_size": 5, "best_of": 5, "temperature": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0], "batched": False}
 
 
-def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any]) -> list[dict]:
+def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any], on_progress=None) -> list[dict]:
     model, batched, device = _load_models(cfg["model"])
     params = _mode_params(cfg["mode"])
     language = None if cfg["language"] == "auto" else cfg["language"]
@@ -196,10 +196,17 @@ def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any]) -> list[dic
                 "words": words,
             }
         )
+    # Local progress: based on decoded segment coverage.
+    if on_progress is not None and duration > 0 and segments:
+        try:
+            last_end = segments[-1]["end"] - offset if offset else segments[-1]["end"]
+            on_progress(min(0.99, last_end / duration))
+        except Exception:  # noqa: BLE001
+            pass
     return segments
 
 
-def _run_transcribe(audio_path: Path, offset: float, duration: float) -> tuple[list[dict], str]:
+def _run_transcribe(audio_path: Path, offset: float, duration: float, on_progress=None) -> tuple[list[dict], str]:
     cfg = get_whisper_config()
     if cfg["backend"] == "remote":
         try:
@@ -213,17 +220,18 @@ def _run_transcribe(audio_path: Path, offset: float, duration: float) -> tuple[l
                     "hotwords": cfg["hotwords"],
                     "_duration": duration,
                 },
+                on_progress=on_progress,
             )
             return segments, f"whisper:remote:{cfg['model']}"
         except Exception as exc:  # noqa: BLE001
             print(f"[transcribe] remote failed, falling back to local: {exc}")
-    segments = _run_local(audio_path, offset, cfg)
+    segments = _run_local(audio_path, offset, cfg, on_progress=on_progress)
     return segments, f"whisper:local:{cfg['model']}"
 
 
-def transcribe_audio(audio_path: Path, duration: float) -> dict | None:
+def transcribe_audio(audio_path: Path, duration: float, on_progress=None) -> dict | None:
     try:
-        segments, _source = _run_transcribe(audio_path, 0.0, duration)
+        segments, _source = _run_transcribe(audio_path, 0.0, duration, on_progress=on_progress)
     except Exception as exc:  # noqa: BLE001
         print(f"[transcribe] Whisper failed: {exc}")
         return None
@@ -239,7 +247,7 @@ def transcribe_audio(audio_path: Path, duration: float) -> dict | None:
     }
 
 
-def transcribe_clips(source: Path, clips: list[dict], duration: float) -> dict | None:
+def transcribe_clips(source: Path, clips: list[dict], duration: float, on_progress=None) -> dict | None:
     from .media import extract_audio_segment
 
     job_dir = source.parent
@@ -265,6 +273,11 @@ def transcribe_clips(source: Path, clips: list[dict], duration: float) -> dict |
                 print(f"[transcribe] clip {index} failed: {exc}")
                 continue
             all_segments.extend(segs)
+            if on_progress is not None:
+                try:
+                    on_progress(index + 1, len(clips))
+                except Exception:  # noqa: BLE001
+                    pass
     finally:
         for wav in tmp_files:
             try:

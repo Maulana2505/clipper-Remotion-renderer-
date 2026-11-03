@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from ..core.config import FFMPEG, JOBS_DIR
 from ..db import get_conn, now_iso, update_job
 from ..templates import NICHE_BY_ID
 from .highlights import detect_clips_from_audio
+from .transcript_job import run_transcript
 from .media import (
     MediaError,
     download_video,
@@ -234,6 +236,25 @@ def process_job(job_id: str) -> None:
             ),
         )
         total = len(clips)
+
+        # Auto-transcription at queue time (default: clips scope). Off via
+        # TRANSCRIBE_ON_QUEUE=off; full scope available for LLM re-detect.
+        mode = (os.getenv("TRANSCRIBE_ON_QUEUE") or "clips").lower()
+        if mode in ("clips", "full"):
+            update_job(conn, job_id, stage="transcribe", progress=80, error="")
+            try:
+                run_transcript(
+                    job_id,
+                    mode,
+                    on_progress=lambda done, tot: update_job(
+                        conn,
+                        job_id,
+                        stage="transcribe",
+                        progress=80 + int(18 * done / max(1, tot)),
+                    ),
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"[pipeline] transcript skipped: {exc}")
 
         update_job(
             conn,

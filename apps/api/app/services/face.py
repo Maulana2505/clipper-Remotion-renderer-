@@ -53,7 +53,7 @@ def _load_yunet(width: int, height: int):
     return None
 
 
-def track_faces(source: Path, start: float, end: float) -> dict:
+def track_faces(source: Path, start: float, end: float, on_progress=None) -> dict:
     duration = max(0.1, float(end) - float(start))
     try:
         import cv2  # type: ignore
@@ -175,6 +175,11 @@ def track_faces(source: Path, start: float, end: float) -> dict:
                 if not ok:
                     break
 
+            if on_progress is not None and duration > 0:
+                try:
+                    on_progress(min(99, int(100 * t / duration)))
+                except Exception:  # noqa: BLE001
+                    pass
             frame_index += 1
             t = frame_index / fps
             if t > duration + 1e-6:

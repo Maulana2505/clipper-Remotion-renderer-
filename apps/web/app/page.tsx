@@ -29,6 +29,7 @@ import {
   type NichePreset,
   type StorageOverview,
 } from "@/lib/api";
+import { stageLabel } from "@/lib/stages";
 
 const LONG_VIDEO_SECONDS = 30 * 60;
 
@@ -58,13 +59,30 @@ export default function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api<Job[]>("/api/jobs")
-      .then(setJobs)
-      .catch(() => undefined)
-      .finally(() => setJobsLoading(false));
+    let active = true;
+    const loadJobs = () => {
+      api<Job[]>("/api/jobs")
+        .then((data) => {
+          if (active) setJobs(data);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (active) setJobsLoading(false);
+        });
+    };
+    loadJobs();
+    const jobTimer = setInterval(loadJobs, 2000);
     api<StorageOverview>("/api/storage").then(setStorage).catch(() => undefined);
+    const storageTimer = setInterval(() => {
+      api<StorageOverview>("/api/storage").then(setStorage).catch(() => undefined);
+    }, 15000);
     api<NichePreset[]>("/api/niches").then(setNiches).catch(() => undefined);
     api<Channel[]>("/api/channels").then(setChannels).catch(() => undefined);
+    return () => {
+      active = false;
+      clearInterval(jobTimer);
+      clearInterval(storageTimer);
+    };
   }, []);
 
   const activeChannel = channels.find((channel) => channel.id === channelId) || null;
@@ -507,11 +525,13 @@ export default function ImportPage() {
                     {job.clip_count || 0} clip{(job.clip_count || 0) === 1 ? "" : "s"}
                     {job.niche && job.niche !== "generic" ? ` · ${job.niche}` : ""}
                   </span>
-                  <span>{job.stage}</span>
+                  <span>{stageLabel(job.stage)}</span>
                 </div>
                 <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/5">
                   <div
-                    className={`h-full rounded-full ${job.status === "failed" ? "bg-red-400" : "bg-lime"}`}
+                    className={`h-full rounded-full ${job.status === "failed" ? "bg-red-400" : "bg-lime"} ${
+                      job.status === "processing" ? "animate-pulse" : ""
+                    }`}
                     style={{ width: `${Math.max(3, job.progress)}%` }}
                   />
                 </div>

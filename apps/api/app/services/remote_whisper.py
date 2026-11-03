@@ -141,7 +141,7 @@ def _dedupe(segments: list[dict]) -> list[dict]:
     return out
 
 
-def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any]) -> list[dict]:
+def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any], on_progress=None) -> list[dict]:
     """Transcribe a (possibly long) audio file via the remote worker.
 
     Long audio is sent in chunks to stay under Cloudflare's upload limit.
@@ -172,6 +172,11 @@ def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any]) -
 
     if not duration or duration <= _CHUNK_SECONDS:
         # Single request path (also used for clip-scoped short audio).
+        if on_progress is not None:
+            try:
+                on_progress(1, 1)
+            except Exception:  # noqa: BLE001
+                pass
         return _post_one(cfg, "/transcribe", audio_path, offset, params)
 
     # Chunked path.
@@ -187,6 +192,11 @@ def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any]) -
         try:
             extract_audio_segment(audio_path, chunk_path, start, length)
             print(f"[transcribe] remote chunk {idx + 1}/{total_chunks} ({start / 60:.1f}-{(start + length) / 60:.1f} min)", flush=True)
+            if on_progress is not None:
+                try:
+                    on_progress(idx + 1, total_chunks)
+                except Exception:  # noqa: BLE001
+                    pass
             segs = _post_one(cfg, "/transcribe", chunk_path, offset + start, params)
             all_segments.extend(segs)
         finally:

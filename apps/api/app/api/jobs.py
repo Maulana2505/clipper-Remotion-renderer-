@@ -16,82 +16,12 @@ from ..services.media import MediaError, ensure_disk_space, extract_audio, is_sa
 from ..services.pipeline import process_job
 from ..services.redetect import is_running as is_redetect_running
 from ..services.redetect import redetect_clips, redetect_status
-from ..services.transcribe import (
-    fallback_transcript,
-    transcribe_audio,
-    transcribe_clips,
-    transcribe_from_vtt,
-    transcribe_from_vtt_clips,
-)
+from ..services.transcript_job import is_running as is_transcript_running, run_transcript
 from ..templates import NICHE_BY_ID
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"}
-
-# Transcription is opt-in: the job pipeline no longer runs Whisper, the Studio
-# asks for it only when the user wants captions.
-_TRANSCRIPT_RUNNING: set[str] = set()
-_TRANSCRIPT_LOCK = threading.Lock()
-
-
-def _run_transcript(job_id: str, scope: str = "clips") -> None:
-    scope = "full" if scope == "full" else "clips"
-    try:
-        with get_conn() as conn:
-            job = row_to_dict(
-                conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-            )
-            clip_rows = conn.execute(
-                "SELECT start_time, end_time FROM clips WHERE job_id = ? ORDER BY start_time",
-                (job_id,),
-            ).fetchall()
-        if not job or not job.get("video_path"):
-            return
-        source = Path(job["video_path"])
-        if not source.exists():
-            return
-        job_dir = source.parent
-        duration = float(job.get("duration") or 0.0)
-        clips = [{"start": float(r["start_time"]), "end": float(r["end_time"])} for r in clip_rows]
-
-        vtts = sorted(job_dir.glob("subs*.vtt"))
-
-        transcript = None
-        if scope == "clips" and vtts:
-            transcript = transcribe_from_vtt_clips(vtts[0], clips, duration)
-        elif scope == "full" and vtts:
-            transcript = transcribe_from_vtt(vtts[0], duration)
-
-        if transcript is None:
-            if scope == "clips" and clips:
-                transcript = transcribe_clips(source, clips, duration)
-            else:
-                audio = extract_audio(source, job_dir / "audio.wav")
-                transcript = transcribe_audio(audio, duration)
-
-        if transcript is None and vtts:
-            transcript = transcribe_from_vtt(vtts[0], duration) if scope == "full" else transcribe_from_vtt_clips(vtts[0], clips, duration)
-
-        if transcript is None:
-            transcript = fallback_transcript(duration)
-
-        # Ensure scope reflects reality.
-        transcript["scope"] = scope
-        path = job_dir / "transcript.json"
-        path.write_text(json.dumps(transcript, ensure_ascii=False, indent=2), encoding="utf-8")
-        with get_conn() as conn:
-            conn.execute(
-                "UPDATE jobs SET transcript_path = ?, transcript_scope = ?, updated_at = ? WHERE id = ?",
-                (str(path), scope, now_iso(), job_id),
-            )
-            conn.commit()
-        print(f"[transcript] job {job_id} ready (scope={scope})")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[transcript] job {job_id} failed: {exc}")
-    finally:
-        with _TRANSCRIPT_LOCK:
-            _TRANSCRIPT_RUNNING.discard(job_id)
 
 
 def _create_job(
@@ -295,11 +225,9 @@ def generate_job_transcript(job_id: str, force: bool = False, scope: str = "clip
         raise HTTPException(status_code=404, detail="Job not found.")
     if row["transcript_path"] and Path(row["transcript_path"]).exists() and not force and (row["transcript_scope"] or "clips") == scope:
         return {"status": "ready", "scope": scope}
-    with _TRANSCRIPT_LOCK:
-        if job_id in _TRANSCRIPT_RUNNING:
-            return {"status": "running", "scope": scope}
-        _TRANSCRIPT_RUNNING.add(job_id)
-    threading.Thread(target=_run_transcript, args=(job_id, scope), daemon=True).start()
+    if is_transcript_running(job_id):
+        return {"status": "running", "scope": scope}
+    threading.Thread(target=run_transcript, args=(job_id, scope), daemon=True).start()
     return {"status": "running", "scope": scope}
 
 

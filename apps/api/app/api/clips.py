@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from ..db import get_conn, row_to_dict
 from ..schemas import ClipPatch
+from ..services.activity import finish as activity_finish, start as activity_start, update as activity_update
 from ..services.face import track_faces
 from ..templates import CANVAS_BY_ID, CAPTION_BY_ID, FONT_BY_ID, VIDEO_TEMPLATES
 
@@ -25,6 +26,7 @@ def _face_track_path(job_dir: Path, clip_id: str) -> Path:
 
 
 def _run_face_track(clip_id: str) -> None:
+    activity_start(f"face:{clip_id}", "face", clip_id, "Face track", total=100)
     try:
         with get_conn() as conn:
             clip = row_to_dict(conn.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone())
@@ -38,7 +40,10 @@ def _run_face_track(clip_id: str) -> None:
         source = Path(job["video_path"])
         if not source.exists():
             return
-        track = track_faces(source, float(clip["start_time"]), float(clip["end_time"]))
+        track = track_faces(
+            source, float(clip["start_time"]), float(clip["end_time"]),
+            on_progress=lambda p: activity_update(f"face:{clip_id}", progress=p),
+        )
         destination = _face_track_path(source.parent, clip_id)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(track, ensure_ascii=False), encoding="utf-8")
@@ -51,6 +56,7 @@ def _run_face_track(clip_id: str) -> None:
     except Exception as exc:  # noqa: BLE001
         print(f"[face] clip {clip_id} failed: {exc}")
     finally:
+        activity_finish(f"face:{clip_id}")
         with _FACE_LOCK:
             _FACE_RUNNING.discard(clip_id)
 

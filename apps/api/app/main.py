@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import channels, clips, jobs, renders, settings, storage, templates
+from .api import activity, channels, clips, jobs, renders, settings, storage, templates
 from .core.config import CORS_ORIGINS
 from .db import init_db
 
@@ -30,6 +30,7 @@ app.include_router(renders.router)
 app.include_router(settings.router)
 app.include_router(templates.router)
 app.include_router(storage.router)
+app.include_router(activity.router)
 
 
 @app.get("/api/health")

@@ -20,6 +20,7 @@ import threading
 from pathlib import Path
 
 from ..db import get_conn, row_to_dict
+from .activity import finish as activity_finish, start as activity_start, update as activity_update
 from .llm import detect_clips
 from .pipeline import clip_meta, insert_clips, load_channel, resolve_preset
 
@@ -155,6 +156,8 @@ def _fuse_with_audio(
 
 def redetect_clips(job_id: str, mode: str = "merge") -> dict:
     mode = "replace" if mode == "replace" else "merge"
+    activity_start(f"redetect:{job_id}", "redetect", job_id, "Re-detect", total=100)
+    activity_update(f"redetect:{job_id}", progress=10)
     _write_state(job_id, status="running", mode=mode, added=0, skipped=0, source=None, error="")
     try:
         with get_conn() as conn:
@@ -242,11 +245,14 @@ def redetect_clips(job_id: str, mode: str = "merge") -> dict:
             source=source,
             error="",
         )
+        activity_update(f"redetect:{job_id}", progress=100)
         print(
             f"[redetect] job {job_id} {mode}: +{len(clip_ids)} clips "
             f"({skipped} skipped, {source})"
         )
+        activity_finish(f"redetect:{job_id}", status="done")
         return state
     except Exception as exc:  # noqa: BLE001
         print(f"[redetect] job {job_id} failed: {exc}")
+        activity_finish(f"redetect:{job_id}", status="error")
         return _write_state(job_id, status="error", error=str(exc))
