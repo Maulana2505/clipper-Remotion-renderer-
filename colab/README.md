@@ -8,6 +8,10 @@ Jalankan `ClipperWhisperWorker.ipynb` di Google Colab (runtime GPU). Di cell ter
 - Auth: Bearer token
 - Model default: `large-v3-turbo` (fp16, CUDA)
 
+Token otomatis dibuat kuat di cell 2 dan dicetak di output-nya. Untuk melihat ulang kapan saja,
+jalankan cell "Tampilkan kredensial" atau `!cat /content/.clipper_token` dan `!cat /content/.clipper_url`
+di cell baru.
+
 Catatan:
 - Colab gratis bisa disconnect; jika worker mati, Clipper otomatis fallback ke Whisper lokal.
 - Model diunduh ulang tiap sesi (~1.5 GB). Cache ke Google Drive jika perlu.
