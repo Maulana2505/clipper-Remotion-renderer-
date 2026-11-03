@@ -109,6 +109,12 @@ MIGRATIONS: list[tuple[str, str, str]] = [
     ("clips", "reason", "TEXT"),
     ("clips", "signals_json", "TEXT"),
     ("app_settings", "whisper_model", "TEXT"),
+    ("app_settings", "whisper_backend", "TEXT"),
+    ("app_settings", "whisper_language", "TEXT"),
+    ("app_settings", "whisper_mode", "TEXT"),
+    ("app_settings", "whisper_hotwords", "TEXT"),
+    ("app_settings", "remote_whisper_url", "TEXT"),
+    ("app_settings", "encrypted_remote_token", "TEXT"),
     ("renders", "engine", "TEXT"),
     ("renders", "duration_ms", "INTEGER"),
 ]

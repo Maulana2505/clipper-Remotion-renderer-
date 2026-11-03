@@ -149,6 +149,12 @@ export interface FontPreset {
 
 export interface WhisperSettings {
   model: string;
+  backend: "local" | "remote";
+  language: string;
+  mode: string;
+  hotwords?: string | null;
+  remote_url?: string | null;
+  remote_token_masked?: string;
 }
 
 export interface LlmSettings {

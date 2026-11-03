@@ -25,7 +25,15 @@ export default function SettingsDrawer({ open, onClose }: Props) {
   const [temperature, setTemperature] = useState(0.3);
   const [maxClips, setMaxClips] = useState(20);
   const [whisperModel, setWhisperModel] = useState("small");
+  const [whisperBackend, setWhisperBackend] = useState<"local" | "remote">("local");
+  const [whisperLanguage, setWhisperLanguage] = useState("auto");
+  const [whisperMode, setWhisperMode] = useState("balanced");
+  const [whisperHotwords, setWhisperHotwords] = useState("");
+  const [whisperRemoteUrl, setWhisperRemoteUrl] = useState("");
+  const [whisperRemoteToken, setWhisperRemoteToken] = useState("");
+  const [whisperRemoteTokenMasked, setWhisperRemoteTokenMasked] = useState("");
   const [whisperBusy, setWhisperBusy] = useState(false);
+  const [whisperTesting, setWhisperTesting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -49,7 +57,16 @@ export default function SettingsDrawer({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     api<WhisperSettings>("/api/settings/whisper")
-      .then((data) => setWhisperModel(data.model || "small"))
+      .then((data) => {
+        setWhisperModel(data.model || "small");
+        setWhisperBackend(data.backend === "remote" ? "remote" : "local");
+        setWhisperLanguage(data.language || "auto");
+        setWhisperMode(data.mode || "balanced");
+        setWhisperHotwords(data.hotwords || "");
+        setWhisperRemoteUrl(data.remote_url || "");
+        setWhisperRemoteTokenMasked(data.remote_token_masked || "");
+        setWhisperRemoteToken("");
+      })
       .catch(() => {});
   }, [open]);
 
@@ -113,14 +130,49 @@ export default function SettingsDrawer({ open, onClose }: Props) {
     try {
       const data = await api<WhisperSettings>("/api/settings/whisper", {
         method: "PUT",
-        body: JSON.stringify({ model: whisperModel }),
+        body: JSON.stringify({
+          model: whisperModel,
+          backend: whisperBackend,
+          language: whisperLanguage,
+          mode: whisperMode,
+          hotwords: whisperHotwords.trim() || null,
+          remote_url: whisperRemoteUrl.trim() || null,
+          remote_token: whisperRemoteToken.trim() ? whisperRemoteToken.trim() : undefined,
+        }),
       });
       setWhisperModel(data.model);
-      setMessage({ kind: "ok", text: "Whisper model saved." });
+      setWhisperBackend(data.backend === "remote" ? "remote" : "local");
+      setWhisperRemoteTokenMasked(data.remote_token_masked || "");
+      setWhisperRemoteToken("");
+      setMessage({ kind: "ok", text: "Whisper settings saved." });
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : "Save failed." });
     } finally {
       setWhisperBusy(false);
+    }
+  }
+
+  async function testWhisperRemote() {
+    setWhisperTesting(true);
+    setMessage(null);
+    try {
+      const data = await api<{ ok: boolean; message: string }>("/api/settings/whisper/test", {
+        method: "POST",
+        body: JSON.stringify({
+          model: whisperModel,
+          backend: whisperBackend,
+          language: whisperLanguage,
+          mode: whisperMode,
+          hotwords: whisperHotwords.trim() || null,
+          remote_url: whisperRemoteUrl.trim() || null,
+          remote_token: whisperRemoteToken.trim() || null,
+        }),
+      });
+      setMessage({ kind: "ok", text: data.message });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : "Test failed." });
+    } finally {
+      setWhisperTesting(false);
     }
   }
 
@@ -242,32 +294,112 @@ export default function SettingsDrawer({ open, onClose }: Props) {
             </label>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-panel p-4">
-            <div className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-400">Transcription model (Whisper)</div>
-            <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-              Smaller = faster but less accurate. Applied to new transcription jobs.
-            </p>
-            <div className="flex gap-2">
-              <select
-                value={whisperModel}
-                onChange={(event) => setWhisperModel(event.target.value)}
-                className="flex-1 rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
-              >
-                <option value="tiny">tiny — fastest, lowest quality</option>
-                <option value="base">base — fast, OK for clean audio</option>
-                <option value="small">small — balanced (recommended)</option>
-                <option value="medium">medium — slower, more accurate</option>
-                <option value="large-v3">large-v3 — slowest, best (needs RAM)</option>
-              </select>
+          <div className="rounded-xl border border-white/10 bg-panel p-4 space-y-3">
+            <div className="text-xs font-medium uppercase tracking-wider text-zinc-400">Transcription (Whisper)</div>
+
+            <label className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-white">Pakai Colab tunnel</div>
+                <p className="text-xs text-zinc-500">Jalankan worker di Colab GPU, tempel URL + token.</p>
+              </div>
               <button
-                onClick={saveWhisper}
-                disabled={whisperBusy}
-                className="flex items-center justify-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-semibold text-black hover:bg-lime/90 disabled:opacity-50"
+                type="button"
+                onClick={() => setWhisperBackend(whisperBackend === "remote" ? "local" : "remote")}
+                className={`relative h-6 w-11 rounded-full transition ${whisperBackend === "remote" ? "bg-lime" : "bg-white/10"}`}
+                aria-pressed={whisperBackend === "remote"}
               >
-                {whisperBusy ? <Loader2 size={15} className="animate-spin" /> : null}
-                Save
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${whisperBackend === "remote" ? "left-5" : "left-0.5"}`}
+                />
               </button>
+            </label>
+
+            {whisperBackend === "remote" ? (
+              <div className="space-y-2">
+                <input
+                  value={whisperRemoteUrl}
+                  onChange={(e) => setWhisperRemoteUrl(e.target.value)}
+                  placeholder="https://xxxx.trycloudflare.com"
+                  className="w-full rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
+                />
+                <input
+                  value={whisperRemoteToken}
+                  onChange={(e) => setWhisperRemoteToken(e.target.value)}
+                  placeholder={whisperRemoteTokenMasked ? `Token tersimpan (${whisperRemoteTokenMasked})` : "Token"}
+                  className="w-full rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
+                />
+                <button
+                  onClick={testWhisperRemote}
+                  disabled={whisperTesting || !whisperRemoteUrl.trim()}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2 text-xs font-medium text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+                >
+                  {whisperTesting ? <Loader2 size={13} className="animate-spin" /> : null}
+                  Test connection
+                </button>
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">Model</span>
+                <select
+                  value={whisperModel}
+                  onChange={(e) => setWhisperModel(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
+                >
+                  <option value="tiny">tiny — fastest</option>
+                  <option value="base">base — fast</option>
+                  <option value="small">small — balanced</option>
+                  <option value="medium">medium — more accurate</option>
+                  <option value="large-v3-turbo">large-v3-turbo — GPU best</option>
+                  <option value="large-v3">large-v3 — max accuracy</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">Bahasa</span>
+                <select
+                  value={whisperLanguage}
+                  onChange={(e) => setWhisperLanguage(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="id">Indonesia</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
             </div>
+
+            <label className="block">
+              <span className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">Mode</span>
+              <select
+                value={whisperMode}
+                onChange={(e) => setWhisperMode(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
+              >
+                <option value="fast">Cepat (greedy)</option>
+                <option value="balanced">Seimbang (beam 5) — recommended</option>
+                <option value="accurate">Akurat (beam 5 + retry)</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">Hotwords (opsional)</span>
+              <input
+                value={whisperHotwords}
+                onChange={(e) => setWhisperHotwords(e.target.value)}
+                placeholder="nama pemain, istilah game, ..."
+                className="w-full rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
+              />
+            </label>
+
+            <button
+              onClick={saveWhisper}
+              disabled={whisperBusy}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-lime px-3 py-2.5 text-sm font-semibold text-black hover:bg-lime/90 disabled:opacity-50"
+            >
+              {whisperBusy ? <Loader2 size={15} className="animate-spin" /> : null}
+              Save Whisper settings
+            </button>
           </div>
 
           {message ? (

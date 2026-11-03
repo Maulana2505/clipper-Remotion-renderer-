@@ -121,6 +121,12 @@ class LlmTestRequest(BaseModel):
 
 class WhisperSettingsUpdate(BaseModel):
     model: str = Field(default="small", min_length=1, max_length=40)
+    backend: str = Field(default="local", pattern="^(local|remote)$")
+    language: str = Field(default="auto", max_length=12)
+    mode: str = Field(default="balanced", pattern="^(fast|balanced|accurate)$")
+    hotwords: str | None = Field(default=None, max_length=500)
+    remote_url: str | None = Field(default=None, max_length=500)
+    remote_token: str | None = Field(default=None, max_length=500)
 
 
 __all__ = [
