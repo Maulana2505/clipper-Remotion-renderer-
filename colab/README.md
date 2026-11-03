@@ -16,3 +16,5 @@ Catatan:
 - Colab gratis bisa disconnect; jika worker mati, Clipper otomatis fallback ke Whisper lokal.
 - Model diunduh ulang tiap sesi (~1.5 GB). Cache ke Google Drive jika perlu.
 - Jangan bagikan URL + token.
+- Kalau muncul `TypeError: open() got an unexpected keyword argument 'metadata_errors'`,
+  jalankan ulang cell install (upgrade PyAV >= 12) lalu restart runtime.
