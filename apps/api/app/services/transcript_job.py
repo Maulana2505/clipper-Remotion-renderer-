@@ -9,6 +9,7 @@ from ..core.config import JOBS_DIR
 from ..db import get_conn, now_iso, row_to_dict
 from .activity import finish as activity_finish, start as activity_start, update as activity_update
 from .media import extract_audio
+from .models import normalize_model
 from .transcribe import (
     fallback_transcript,
     transcribe_audio,
@@ -34,10 +35,11 @@ def _set_running(job_id: str, running: bool) -> None:
             _RUNNING.discard(job_id)
 
 
-def run_transcript(job_id: str, scope: str = "clips", on_progress: Callable[[int, int], None] | None = None) -> None:
+def run_transcript(job_id: str, scope: str = "clips", on_progress: Callable[[int, int], None] | None = None, model: str | None = None) -> None:
     scope = "full" if scope == "full" else "clips"
     _set_running(job_id, True)
-    activity_start(f"transcript:{job_id}", "transcript", job_id, "Transkripsi", total=1)
+    used_model = normalize_model(model)
+    activity_start(f"transcript:{job_id}", "transcript", job_id, f"Transkripsi · {used_model}", total=1)
     try:
         with get_conn() as conn:
             job = row_to_dict(conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone())
@@ -64,12 +66,12 @@ def run_transcript(job_id: str, scope: str = "clips", on_progress: Callable[[int
         if transcript is None:
             if scope == "clips" and clips:
                 transcript = transcribe_clips(
-                    source, clips, duration, on_progress=on_progress
+                    source, clips, duration, on_progress=on_progress, model=used_model
                 )
             else:
                 audio = extract_audio(source, job_dir / "audio.wav")
                 transcript = transcribe_audio(
-                    audio, duration, on_progress=on_progress
+                    audio, duration, on_progress=on_progress, model=used_model
                 )
 
         if transcript is None and vtts:

@@ -147,8 +147,16 @@ export interface FontPreset {
   family: string;
 }
 
+export type WhisperModel = "base" | "small" | "large-v3-turbo";
+
+export const WHISPER_MODELS: { id: WhisperModel; label: string; hint: string }[] = [
+  { id: "base", label: "Base", hint: "Tercepat, kualitas dasar" },
+  { id: "small", label: "Small", hint: "Seimbang (default lokal)" },
+  { id: "large-v3-turbo", label: "Turbo", hint: "Paling akurat, butuh GPU" },
+];
+
 export interface WhisperSettings {
-  model: string;
+  model: WhisperModel;
   backend: "local" | "remote";
   language: string;
   mode: string;

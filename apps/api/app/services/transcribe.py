@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from ..core.config import WHISPER_MODEL
+from .models import normalize_model
 
 _MODEL = None
 _BATCHED = None
@@ -44,7 +45,7 @@ def get_whisper_config() -> dict[str, Any]:
     from ..core.security import decrypt_secret
     token = decrypt_secret(data.get("encrypted_remote_token"))
     return {
-        "model": data.get("whisper_model") or WHISPER_MODEL,
+        "model": normalize_model(data.get("whisper_model") or WHISPER_MODEL),
         "backend": data.get("whisper_backend") or "local",
         "language": data.get("whisper_language") or "auto",
         "mode": data.get("whisper_mode") or "balanced",
@@ -70,6 +71,11 @@ def _load_models(model_name: str):
     key = (model_name, device, compute)
     if _MODEL is not None and _MODEL_KEY == key:
         return _MODEL, _BATCHED, device
+    if _MODEL is not None and _MODEL_KEY != key:
+        _MODEL = None
+        _BATCHED = None
+        import gc
+        gc.collect()
     from faster_whisper import WhisperModel  # type: ignore
 
     try:
@@ -115,8 +121,8 @@ def _mode_params(mode: str) -> dict[str, Any]:
     return {"beam_size": 5, "best_of": 5, "temperature": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0], "batched": False}
 
 
-def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any], on_progress=None) -> list[dict]:
-    model, batched, device = _load_models(cfg["model"])
+def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any], on_progress=None, model: str | None = None) -> list[dict]:
+    model, batched, device = _load_models(model or cfg["model"])
     params = _mode_params(cfg["mode"])
     language = None if cfg["language"] == "auto" else cfg["language"]
     hotwords = cfg.get("hotwords") or None
@@ -206,7 +212,7 @@ def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any], on_progress
     return segments
 
 
-def _run_transcribe(audio_path: Path, offset: float, duration: float, on_progress=None) -> tuple[list[dict], str]:
+def _run_transcribe(audio_path: Path, offset: float, duration: float, on_progress=None, model: str | None = None) -> tuple[list[dict], str]:
     cfg = get_whisper_config()
     if cfg["backend"] == "remote":
         try:
@@ -221,17 +227,20 @@ def _run_transcribe(audio_path: Path, offset: float, duration: float, on_progres
                     "_duration": duration,
                 },
                 on_progress=on_progress,
+                model=model,
             )
-            return segments, f"whisper:remote:{cfg['model']}"
+            used = model or cfg["model"]
+            return segments, f"whisper:remote:{used}"
         except Exception as exc:  # noqa: BLE001
             print(f"[transcribe] remote failed, falling back to local: {exc}")
-    segments = _run_local(audio_path, offset, cfg, on_progress=on_progress)
-    return segments, f"whisper:local:{cfg['model']}"
+    segments = _run_local(audio_path, offset, cfg, on_progress=on_progress, model=model)
+    used = model or cfg["model"]
+    return segments, f"whisper:local:{used}"
 
 
-def transcribe_audio(audio_path: Path, duration: float, on_progress=None) -> dict | None:
+def transcribe_audio(audio_path: Path, duration: float, on_progress=None, model: str | None = None) -> dict | None:
     try:
-        segments, _source = _run_transcribe(audio_path, 0.0, duration, on_progress=on_progress)
+        segments, _source = _run_transcribe(audio_path, 0.0, duration, on_progress=on_progress, model=model)
     except Exception as exc:  # noqa: BLE001
         print(f"[transcribe] Whisper failed: {exc}")
         return None
@@ -247,7 +256,7 @@ def transcribe_audio(audio_path: Path, duration: float, on_progress=None) -> dic
     }
 
 
-def transcribe_clips(source: Path, clips: list[dict], duration: float, on_progress=None) -> dict | None:
+def transcribe_clips(source: Path, clips: list[dict], duration: float, on_progress=None, model: str | None = None) -> dict | None:
     from .media import extract_audio_segment
 
     job_dir = source.parent
@@ -268,7 +277,7 @@ def transcribe_clips(source: Path, clips: list[dict], duration: float, on_progre
                 print(f"[transcribe] segment extract failed: {exc}")
                 continue
             try:
-                segs, _src = _run_transcribe(wav, start, duration)
+                segs, _src = _run_transcribe(wav, start, duration, model=model)
             except Exception as exc:  # noqa: BLE001
                 print(f"[transcribe] clip {index} failed: {exc}")
                 continue

@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from ..core.security import decrypt_secret, encrypt_secret, mask_secret
 from ..db import get_conn, now_iso
 from ..core.config import WHISPER_MODEL
+from ..services.models import normalize_model
 from ..core.security import decrypt_secret, encrypt_secret, mask_secret
 from ..schemas import LlmSettingsUpdate, LlmTestRequest, WhisperSettingsUpdate
 from ..services.llm import test_connection
@@ -125,7 +126,7 @@ def get_whisper_settings():
     data = dict(row) if row else {}
     token = decrypt_secret(data.get("encrypted_remote_token"))
     return {
-        "model": data.get("whisper_model") or WHISPER_MODEL,
+        "model": normalize_model(data.get("whisper_model") or WHISPER_MODEL),
         "backend": data.get("whisper_backend") or "local",
         "language": data.get("whisper_language") or "auto",
         "mode": data.get("whisper_mode") or "balanced",
@@ -172,7 +173,7 @@ def save_whisper_settings(payload: WhisperSettingsUpdate):
     data = dict(row) if row else {}
     token = decrypt_secret(data.get("encrypted_remote_token"))
     return {
-        "model": data.get("whisper_model") or WHISPER_MODEL,
+        "model": normalize_model(data.get("whisper_model") or WHISPER_MODEL),
         "backend": data.get("whisper_backend") or "local",
         "language": data.get("whisper_language") or "auto",
         "mode": data.get("whisper_mode") or "balanced",

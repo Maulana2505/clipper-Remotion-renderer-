@@ -216,9 +216,13 @@ def get_job_transcript(job_id: str):
 
 
 @router.post("/{job_id}/transcript")
-def generate_job_transcript(job_id: str, force: bool = False, scope: str = "clips"):
+def generate_job_transcript(job_id: str, force: bool = False, scope: str = "clips", whisper_model: str | None = None):
     """Opt-in transcription. Runs in the background; poll the GET endpoint."""
     scope = "full" if scope == "full" else "clips"
+    from ..services.models import is_valid_model, normalize_model
+    if whisper_model is not None and not is_valid_model(whisper_model):
+        raise HTTPException(status_code=422, detail="Unknown model. Choose base, small, or large-v3-turbo.")
+    chosen_model = normalize_model(whisper_model) if whisper_model else None
     with get_conn() as conn:
         row = conn.execute("SELECT transcript_path, transcript_scope FROM jobs WHERE id = ?", (job_id,)).fetchone()
     if row is None:
@@ -227,7 +231,7 @@ def generate_job_transcript(job_id: str, force: bool = False, scope: str = "clip
         return {"status": "ready", "scope": scope}
     if is_transcript_running(job_id):
         return {"status": "running", "scope": scope}
-    threading.Thread(target=run_transcript, args=(job_id, scope), daemon=True).start()
+    threading.Thread(target=run_transcript, args=(job_id, scope), kwargs={"model": chosen_model}, daemon=True).start()
     return {"status": "running", "scope": scope}
 
 

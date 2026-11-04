@@ -80,6 +80,23 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [hasTranscript, setHasTranscript] = useState(false);
   const [transcriptScope, setTranscriptScope] = useState<"clips" | "full">("clips");
   const [transcriptBusy, setTranscriptBusy] = useState(false);
+  const [transcriptModel, setTranscriptModel] = useState("small");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("clipper.transcriptModel");
+      if (saved) setTranscriptModel(saved);
+    } catch {
+      // ignore
+    }
+    api<{ model?: string }>("/api/settings/whisper")
+      .then((d) => {
+        if (d?.model) {
+          setTranscriptModel(d.model);
+          try { window.localStorage.setItem("clipper.transcriptModel", d.model); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => undefined);
+  }, []);
   const [redetectBusy, setRedetectBusy] = useState(false);
   const [redetectMode, setRedetectMode] = useState<"merge" | "replace">("merge");
   const [faceBusy, setFaceBusy] = useState(false);
@@ -392,12 +409,12 @@ export default function StudioClient({ jobId }: { jobId: string }) {
     changeOverlays(next);
   }
 
-  async function generateTranscript(scope: "clips" | "full" = "clips") {
+  async function generateTranscript(scope: "clips" | "full" = "clips", model: string = transcriptModel) {
     if (!selectedClip || transcriptBusy) return;
     setTranscriptBusy(true);
     setError(null);
     try {
-      await api(`/api/jobs/${jobId}/transcript?scope=${scope}`, { method: "POST" });
+      await api(`/api/jobs/${jobId}/transcript?scope=${scope}&whisper_model=${encodeURIComponent(model)}`, { method: "POST" });
       setNotice(
         scope === "clips"
           ? "Transcribing clip captions in the background…"
@@ -642,6 +659,11 @@ export default function StudioClient({ jobId }: { jobId: string }) {
               hasTranscript={hasTranscript}
               transcriptScope={transcriptScope}
               transcriptBusy={transcriptBusy}
+              transcriptModel={transcriptModel}
+              onTranscriptModelChange={(m) => {
+                setTranscriptModel(m);
+                try { window.localStorage.setItem("clipper.transcriptModel", m); } catch { /* ignore */ }
+              }}
               onGenerateTranscript={generateTranscript}
               faceBusy={faceBusy}
               faceReady={faceReady}
@@ -757,6 +779,8 @@ function StylePanel({
   hasTranscript,
   transcriptScope,
   transcriptBusy,
+  transcriptModel,
+  onTranscriptModelChange,
   onGenerateTranscript,
   faceBusy,
   faceReady,
@@ -784,7 +808,9 @@ function StylePanel({
   hasTranscript: boolean;
   transcriptScope: "clips" | "full";
   transcriptBusy: boolean;
-  onGenerateTranscript: (scope?: "clips" | "full") => void;
+  transcriptModel: string;
+  onTranscriptModelChange: (model: string) => void;
+  onGenerateTranscript: (scope?: "clips" | "full", model?: string) => void;
   faceBusy: boolean;
   faceReady: boolean;
   onGenerateFaceTrack: () => void;
@@ -987,6 +1013,22 @@ function StylePanel({
                 <p className="mt-1 text-[10px] leading-relaxed text-amber-200/70">
                   Captions stay empty until a transcript exists. Transcription is opt-in and runs locally.
                 </p>
+                <div className="mb-2 flex items-center gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+                  {["base", "small", "large-v3-turbo"].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => onTranscriptModelChange(m)}
+                      disabled={transcriptBusy}
+                      className={`flex-1 rounded-md px-2 py-1 text-[10px] font-medium transition ${
+                        transcriptModel === m
+                          ? "bg-lime/15 text-lime"
+                          : "text-zinc-400 hover:text-white"
+                      } disabled:opacity-50`}
+                    >
+                      {m === "large-v3-turbo" ? "Turbo" : m.charAt(0).toUpperCase() + m.slice(1)}
+                    </button>
+                  ))}
+                </div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <button
                     onClick={() => onGenerateTranscript("clips")}

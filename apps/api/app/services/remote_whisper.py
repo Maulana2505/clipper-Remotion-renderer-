@@ -85,7 +85,7 @@ def probe_remote(url: str, token: str | None) -> tuple[bool, str]:
         return False, f"Could not reach worker: {exc}"
 
 
-def _post_one(cfg: dict[str, str], url_path: str, audio_path: Path, offset: float, params: dict[str, Any]) -> list[dict]:
+def _post_one(cfg: dict[str, str], url_path: str, audio_path: Path, offset: float, params: dict[str, Any], model: str | None = None) -> list[dict]:
     headers = _auth_headers(cfg)
     timeout = _http_timeout()
     last_exc: Exception | None = None
@@ -99,6 +99,8 @@ def _post_one(cfg: dict[str, str], url_path: str, audio_path: Path, offset: floa
                     "mode": params.get("mode", "balanced"),
                     "hotwords": params.get("hotwords") or "",
                 }
+                if model:
+                    data["model"] = model
                 with httpx.Client(timeout=timeout) as client:
                     response = client.post(f"{cfg['url']}{url_path}", headers=headers, files=files, data=data)
             if response.status_code >= 400:
@@ -141,7 +143,7 @@ def _dedupe(segments: list[dict]) -> list[dict]:
     return out
 
 
-def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any], on_progress=None) -> list[dict]:
+def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any], on_progress=None, model: str | None = None) -> list[dict]:
     """Transcribe a (possibly long) audio file via the remote worker.
 
     Long audio is sent in chunks to stay under Cloudflare's upload limit.
@@ -177,7 +179,7 @@ def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any], o
                 on_progress(1, 1)
             except Exception:  # noqa: BLE001
                 pass
-        return _post_one(cfg, "/transcribe", audio_path, offset, params)
+        return _post_one(cfg, "/transcribe", audio_path, offset, params, model=model)
 
     # Chunked path.
     job_dir = audio_path.parent
@@ -197,7 +199,7 @@ def remote_transcribe(audio_path: Path, offset: float, params: dict[str, Any], o
                     on_progress(idx + 1, total_chunks)
                 except Exception:  # noqa: BLE001
                     pass
-            segs = _post_one(cfg, "/transcribe", chunk_path, offset + start, params)
+            segs = _post_one(cfg, "/transcribe", chunk_path, offset + start, params, model=model)
             all_segments.extend(segs)
         finally:
             try:

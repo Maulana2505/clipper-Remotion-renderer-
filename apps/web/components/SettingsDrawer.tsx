@@ -347,12 +347,9 @@ export default function SettingsDrawer({ open, onClose }: Props) {
                   onChange={(e) => setWhisperModel(e.target.value)}
                   className="w-full rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
                 >
-                  <option value="tiny">tiny — fastest</option>
-                  <option value="base">base — fast</option>
-                  <option value="small">small — balanced</option>
-                  <option value="medium">medium — more accurate</option>
-                  <option value="large-v3-turbo">large-v3-turbo — GPU best</option>
-                  <option value="large-v3">large-v3 — max accuracy</option>
+                  <option value="base">base — tercepat, kualitas dasar</option>
+                  <option value="small">small — seimbang (default lokal)</option>
+                  <option value="large-v3-turbo">large-v3-turbo — paling akurat (GPU)</option>
                 </select>
               </label>
               <label className="block">

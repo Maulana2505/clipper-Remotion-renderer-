@@ -54,40 +54,60 @@ COMPUTE_PREF = os.getenv("WHISPER_COMPUTE", "float16")
 ALLOW_CPU_FALLBACK = os.getenv("ALLOW_CPU_FALLBACK", "1") == "1"
 
 _model = None
+_model_name: str | None = None
 _device = None
 _load_error: str | None = None
+_MODEL_LOCK = __import__("threading").Lock()
+_ALLOWED_MODELS = {"base", "small", "large-v3-turbo"}
 
 
-def _try_load(device: str, compute: str):
+def _resolve_model(name: str | None) -> str:
+    if name and name in _ALLOWED_MODELS:
+        return name
+    return MODEL_NAME if MODEL_NAME in _ALLOWED_MODELS else "small"
+
+
+def _try_load(name: str, device: str, compute: str):
     from faster_whisper import WhisperModel
-    return WhisperModel(MODEL_NAME, device=device, compute_type=compute)
+    return WhisperModel(name, device=device, compute_type=compute)
 
 
-def get_model():
-    global _model, _device, _load_error
-    if _model is not None:
-        return _model
-    if _load_error is not None:
-        raise RuntimeError(_load_error)
-    errors: list[str] = []
-    candidates: list[tuple[str, str]] = []
-    if DEVICE_PREF == "cuda":
-        candidates.append(("cuda", COMPUTE_PREF))
-    candidates.append(("cpu", "int8"))
-    for device, compute in candidates:
+def get_model(name: str | None = None):
+    global _model, _model_name, _device, _load_error
+    resolved = _resolve_model(name)
+    with _MODEL_LOCK:
+        if _model is not None and _model_name == resolved:
+            return _model, resolved
+        # unload previous
+        _model = None
+        _model_name = None
+        import gc
+        gc.collect()
         try:
-            _model = _try_load(device, compute)
-            _device = device
-            _load_error = None
-            print(f"[worker] model loaded: {MODEL_NAME} on {device} ({compute})", flush=True)
-            return _model
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"{device}/{compute}: {exc}")
-            print(f"[worker] failed to load on {device}/{compute}: {exc}", flush=True)
-            if device == "cuda" and not ALLOW_CPU_FALLBACK:
-                break
-    _load_error = "; ".join(errors)
-    raise RuntimeError(_load_error)
+            import torch
+            torch.cuda.empty_cache()
+        except Exception:  # noqa: BLE001
+            pass
+        errors: list[str] = []
+        candidates: list[tuple[str, str]] = []
+        if DEVICE_PREF == "cuda":
+            candidates.append(("cuda", COMPUTE_PREF))
+        candidates.append(("cpu", "int8"))
+        for device, compute in candidates:
+            try:
+                _model = _try_load(resolved, device, compute)
+                _model_name = resolved
+                _device = device
+                _load_error = None
+                print(f"[worker] model loaded: {resolved} on {device} ({compute})", flush=True)
+                return _model, resolved
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{device}/{compute}: {exc}")
+                print(f"[worker] failed to load {resolved} on {device}/{compute}: {exc}", flush=True)
+                if device == "cuda" and not ALLOW_CPU_FALLBACK:
+                    break
+        _load_error = "; ".join(errors)
+        raise RuntimeError(_load_error)
 
 
 def _auth(auth_header: str | None):
@@ -108,7 +128,8 @@ def health(authorization: str | None = Header(None)):
         cuda_ok = False
     return {
         "status": "ok",
-        "model": MODEL_NAME,
+        "model": _model_name or MODEL_NAME,
+        "models": sorted(_ALLOWED_MODELS),
         "device": _device if _device else DEVICE_PREF,
         "compute": COMPUTE_PREF,
         "model_loaded": _model is not None,
@@ -118,10 +139,10 @@ def health(authorization: str | None = Header(None)):
 
 
 @app.post("/warmup")
-def warmup(authorization: str | None = Header(None)):
+def warmup(authorization: str | None = Header(None), model: str = Form("")):
     _auth(authorization)
     try:
-        model = get_model()
+        model, used_model = get_model(model)
         # Transcribe a tiny silent clip to force VAD + model init.
         import tempfile
         from pathlib import Path
@@ -142,7 +163,7 @@ def warmup(authorization: str | None = Header(None)):
                 tmp_path.unlink(missing_ok=True)
             except Exception:
                 pass
-        return {"ok": True, "model": MODEL_NAME, "device": _device}
+        return {"ok": True, "model": used_model, "device": _device}
     except Exception as exc:  # noqa: BLE001
         tb = traceback.format_exc()
         print(tb, flush=True)
@@ -157,6 +178,7 @@ async def transcribe(
     mode: str = Form("balanced"),
     hotwords: str = Form(""),
     offset: str = Form("0"),
+    model: str = Form(""),
 ):
     _auth(authorization)
     try:
@@ -174,7 +196,7 @@ async def transcribe(
         if tmp_path.stat().st_size < 1024:
             raise HTTPException(status_code=422, detail="Uploaded audio is empty/too small.")
 
-        model = get_model()
+        model, used_model = get_model(model)
         lang = None if language == "auto" else language
 
         if mode == "fast":
@@ -235,7 +257,7 @@ async def transcribe(
                 "text": text,
                 "words": words,
             })
-        return JSONResponse({"segments": segments, "language": getattr(info, "language", "unknown"), "relative": True})
+        return JSONResponse({"segments": segments, "language": getattr(info, "language", "unknown"), "relative": True, "model": used_model})
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
