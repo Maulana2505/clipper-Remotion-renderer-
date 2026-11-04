@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { cropRoom, normalizeCrop, type CropSettings } from "@clipper/video";
 import ClipPreview from "@/components/ClipPreview";
+import CaptionEditor from "@/components/CaptionEditor";
 import {
   api,
   apiUrl,
@@ -76,6 +77,7 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [previewCrop, setPreviewCrop] = useState<CropSettings>({ x: 0.5, y: 0.5, zoom: 1 });
   const [overlayMode, setOverlayMode] = useState<"move" | "pan">("move");
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  const previewRef = useRef<{ seekTo: (time: number) => void } | null>(null);
   const [analysisVersion, setAnalysisVersion] = useState(0);
   const [hasTranscript, setHasTranscript] = useState(false);
   const [transcriptScope, setTranscriptScope] = useState<"clips" | "full">("clips");
@@ -584,6 +586,7 @@ export default function StudioClient({ jobId }: { jobId: string }) {
                 </div>
                 {selectedClip && selectedCanvas ? (
                   <ClipPreview
+                    ref={previewRef}
                     job={job}
                     clip={selectedClip}
                     canvas={selectedCanvas}
@@ -652,6 +655,8 @@ export default function StudioClient({ jobId }: { jobId: string }) {
               accent={accent}
               badgeSuggestions={nichePreset?.badges || []}
               patchClip={patchClip}
+              jobId={jobId}
+              onSeek={(time) => previewRef.current?.seekTo(time)}
               crop={previewCrop}
               onCropChange={changeCrop}
               overlayMode={overlayMode}
@@ -772,6 +777,8 @@ function StylePanel({
   accent,
   badgeSuggestions,
   patchClip,
+  jobId,
+  onSeek,
   crop,
   onCropChange,
   overlayMode,
@@ -801,6 +808,8 @@ function StylePanel({
   accent: string;
   badgeSuggestions: string[];
   patchClip: (patch: Partial<Clip>, applyAll?: boolean) => Promise<void>;
+  jobId: string;
+  onSeek?: (time: number) => void;
   crop: CropSettings;
   onCropChange: (crop: CropSettings) => void;
   overlayMode: "move" | "pan";
@@ -1129,6 +1138,18 @@ function StylePanel({
                 />
               </button>
             </div>
+            {clip ? (
+              <div className="mb-3">
+                <CaptionEditor
+                  jobId={jobId}
+                  clip={clip}
+                  duration={Math.max(0.1, clip.end_time - clip.start_time)}
+                  hasTranscript={hasTranscript}
+                  onPatch={patchClip}
+                  onSeek={onSeek}
+                />
+              </div>
+            ) : null}
             {captionTemplates.map((template) => (
               <TemplateButton
                 key={template.id}

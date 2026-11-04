@@ -84,6 +84,22 @@ class ChannelUpdate(BaseModel):
     notes: str | None = None
 
 
+class CaptionWord(BaseModel):
+    """One word in a clip's editable caption track (clip-relative seconds)."""
+
+    word: str = Field(min_length=1, max_length=120)
+    start: float = Field(default=0.0, ge=0.0)
+    end: float = Field(default=0.0, ge=0.0)
+    line: int = Field(default=0, ge=0)
+
+
+class CaptionTrack(BaseModel):
+    """Editable caption track for a clip (clip-relative seconds)."""
+
+    version: int = 1
+    words: list[CaptionWord] = Field(default_factory=list)
+
+
 class ClipPatch(BaseModel):
     title: str | None = None
     hashtags: list[str] | None = None
@@ -97,6 +113,7 @@ class ClipPatch(BaseModel):
     meta: JobMeta | None = None
     crop: CropSettings | None = None
     overlays: list[OverlaySettings] | None = None
+    captions: CaptionTrack | None = None
 
 
 class RenderRequest(BaseModel):

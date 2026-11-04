@@ -219,6 +219,36 @@ def _shift_words(transcript: dict, start: float, end: float) -> list[dict]:
     return words
 
 
+def _clip_words(clip: dict, transcript: dict, start: float, end: float) -> list[dict]:
+    """Prefer a user-edited caption track (clip-relative) over transcript words."""
+    captions = clip.get("captions")
+    if isinstance(captions, dict) and isinstance(captions.get("words"), list) and captions["words"]:
+        duration = max(0.1, end - start)
+        words: list[dict] = []
+        for w in captions["words"]:
+            try:
+                ws = float(w["start"])
+                we = float(w["end"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            text = str(w.get("word") or "").strip()
+            if not text:
+                continue
+            ws = max(0.0, min(duration, ws))
+            we = max(ws + 0.01, min(duration, we))
+            item: dict = {"word": text, "start": round(ws, 3), "end": round(we, 3)}
+            if w.get("line") is not None:
+                try:
+                    item["line"] = int(w["line"])
+                except (TypeError, ValueError):
+                    pass
+            words.append(item)
+        words.sort(key=lambda item: item["start"])
+        if words:
+            return words
+    return _shift_words(transcript, start, end)
+
+
 def _shift_face(face_track: dict, duration: float) -> list[dict]:
     keyframes: list[dict] = []
     for item in face_track.get("keyframes") or []:
@@ -273,7 +303,7 @@ def build_props(
             "font": clip.get("font_preset") or "anton",
             "accent": accent,
         },
-        "words": _shift_words(transcript, start, end),
+        "words": _clip_words(clip, transcript, start, end),
         "face": {"keyframes": _shift_face(face_track, duration)},
         "meta": {**(meta or {}), "title": clip.get("title") or "", "badge": badge},
     }

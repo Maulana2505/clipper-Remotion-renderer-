@@ -8,7 +8,7 @@ export type CanvasSpec = {
   safe_area?: SafeArea;
 };
 
-export type Word = {word: string; start: number; end: number};
+export type Word = {word: string; start: number; end: number; line?: number};
 
 export type FaceKeyframe = {t: number; x: number; y: number};
 

@@ -139,6 +139,62 @@ def _trim_source(source: Path, start: float, end: float, job_dir: Path) -> Path:
     return trimmed
 
 
+def _refine_clip_boundaries(job_id: str) -> None:
+    """Snap each clip's start/end to the nearest word edges after transcription."""
+    try:
+        from .templates import DETECT_PROFILES
+        import json
+        with get_conn() as conn:
+            job = row_to_dict(conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone())
+        if not job or not job.get("video_path"):
+            return
+        niche = (job.get("niche") or "generic").lower()
+        profile = DETECT_PROFILES.get(niche, DETECT_PROFILES["generic"])
+        min_len = profile.get("min_len", 12)
+        max_len = profile.get("max_len", 60)
+        duration = float(job.get("duration") or 0.0)
+        tpath = job.get("transcript_path")
+        if not tpath:
+            tpath = str(Path(job["video_path"]).parent / "transcript.json")
+        tpath = Path(tpath)
+        if not tpath.exists():
+            return
+        transcript = json.loads(tpath.read_text(encoding="utf-8"))
+        words: list[tuple[float, float]] = []
+        for seg in transcript.get("segments") or []:
+            for w in seg.get("words") or []:
+                try:
+                    words.append((float(w["start"]), float(w["end"])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+        if not words:
+            return
+        with get_conn() as conn:
+            rows = conn.execute("SELECT id, start_time, end_time FROM clips WHERE job_id = ?", (job_id,)).fetchall()
+            for row in rows:
+                cid = row["id"]
+                start = float(row["start_time"])
+                end = float(row["end_time"])
+                cand = [w for w in words if w[1] >= start - 1.2 and w[0] <= end + 1.2]
+                if not cand:
+                    continue
+                ns_opts = [w[0] for w in cand if start - 1.2 <= w[0] <= start + 1.2]
+                ne_opts = [w[1] for w in cand if end - 1.2 <= w[1] <= end + 1.2]
+                ns = (min(ns_opts) - 0.12) if ns_opts else start
+                ne = (max(ne_opts) + 0.25) if ne_opts else end
+                ns = max(0.0, ns)
+                ne = min(duration if duration > 0 else end, ne)
+                if ne - ns < min_len or ne - ns > max_len:
+                    continue
+                if abs(ns - start) < 0.05 and abs(ne - end) < 0.05:
+                    continue
+                conn.execute("UPDATE clips SET start_time = ?, end_time = ? WHERE id = ?", (ns, ne, cid))
+            conn.commit()
+        print(f"[pipeline] refined clip boundaries for job {job_id}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[pipeline] boundary refine skipped: {exc}")
+
+
 def process_job(job_id: str) -> None:
     conn = get_conn()
     try:
@@ -255,6 +311,10 @@ def process_job(job_id: str) -> None:
                 )
             except Exception as exc:  # noqa: BLE001
                 print(f"[pipeline] transcript skipped: {exc}")
+
+        # Auto-refine clip boundaries to word edges (only at queue time).
+        if mode in ("clips", "full"):
+            _refine_clip_boundaries(job_id)
 
         update_job(
             conn,

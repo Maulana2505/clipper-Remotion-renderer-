@@ -156,6 +156,27 @@ def update_clip(clip_id: str, payload: ClipPatch):
     if payload.overlays is not None:
         updates.append("overlays_json = ?")
         params.append(json.dumps([o.model_dump() for o in payload.overlays], ensure_ascii=False))
+    if payload.captions is not None:
+        cleaned = []
+        for w in payload.captions.words:
+            data = w.model_dump()
+            word = str(data.get("word") or "").strip()
+            if not word:
+                continue
+            start = float(data.get("start") or 0.0)
+            end = float(data.get("end") or 0.0)
+            if end <= start:
+                end = start + 0.06
+            cleaned.append({
+                "word": word[:120],
+                "start": round(max(0.0, start), 3),
+                "end": round(max(0.0, end), 3),
+                "line": int(data.get("line") or 0),
+            })
+        cleaned.sort(key=lambda item: (item["line"], item["start"]))
+        track = {"version": payload.captions.version or 1, "words": cleaned}
+        updates.append("captions_json = ?")
+        params.append(json.dumps(track, ensure_ascii=False))
 
     if not updates:
         return get_clip(clip_id)
@@ -169,6 +190,17 @@ def update_clip(clip_id: str, payload: ClipPatch):
         conn.commit()
         updated = conn.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone()
     return row_to_dict(updated)
+
+
+@router.delete("/{clip_id}/captions")
+def reset_clip_captions(clip_id: str):
+    with get_conn() as conn:
+        row = conn.execute("SELECT id FROM clips WHERE id = ?", (clip_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Clip not found.")
+        conn.execute("UPDATE clips SET captions_json = NULL WHERE id = ?", (clip_id,))
+        conn.commit()
+    return {"ok": True}
 
 
 @router.delete("/{clip_id}")

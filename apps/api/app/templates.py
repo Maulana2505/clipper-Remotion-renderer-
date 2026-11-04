@@ -257,11 +257,11 @@ NICHE_BY_ID = {item["id"]: item for item in NICHE_PRESETS}
 
 # Moment-detection tuning per niche. Consumed by services/moments.py.
 DETECT_PROFILES: dict[str, dict] = {
-    "gaming": {"min_len": 12, "max_len": 35, "target": 20, "peak_weight": 1.0, "sustained_weight": 0.5, "visual_weight": 0.9, "visual": True, "boundary": "scene_or_pause"},
-    "football": {"min_len": 15, "max_len": 45, "target": 26, "peak_weight": 0.7, "sustained_weight": 1.0, "visual_weight": 0.8, "visual": True, "boundary": "scene_or_pause"},
-    "podcast": {"min_len": 20, "max_len": 50, "target": 32, "peak_weight": 0.4, "sustained_weight": 0.9, "visual_weight": 0.3, "visual": True, "boundary": "pause"},
-    "education": {"min_len": 20, "max_len": 60, "target": 34, "peak_weight": 0.5, "sustained_weight": 0.8, "visual_weight": 0.3, "visual": True, "boundary": "pause"},
-    "generic": {"min_len": 15, "max_len": 45, "target": 26, "peak_weight": 0.6, "sustained_weight": 0.7, "visual_weight": 0.5, "visual": True, "boundary": "pause_or_scene"},
+    "gaming": {"min_len": 12, "max_len": 35, "target": 20, "peak_weight": 1.0, "sustained_weight": 0.5, "visual_weight": 0.9, "visual": True, "boundary": "scene_or_pause", "seconds_per_clip": 45, "pre_ratio": 0.42, "focus": "impact"},
+    "football": {"min_len": 15, "max_len": 45, "target": 26, "peak_weight": 0.7, "sustained_weight": 1.0, "visual_weight": 0.8, "visual": True, "boundary": "scene_or_pause", "seconds_per_clip": 75, "pre_ratio": 0.46, "focus": "crowd"},
+    "podcast": {"min_len": 20, "max_len": 50, "target": 32, "peak_weight": 0.4, "sustained_weight": 0.9, "visual_weight": 0.3, "visual": True, "boundary": "pause", "seconds_per_clip": 90, "pre_ratio": 0.5, "focus": "speech"},
+    "education": {"min_len": 20, "max_len": 60, "target": 34, "peak_weight": 0.5, "sustained_weight": 0.8, "visual_weight": 0.3, "visual": True, "boundary": "pause", "seconds_per_clip": 100, "pre_ratio": 0.5, "focus": "speech"},
+    "generic": {"min_len": 15, "max_len": 45, "target": 26, "peak_weight": 0.6, "sustained_weight": 0.7, "visual_weight": 0.5, "visual": True, "boundary": "pause_or_scene", "seconds_per_clip": 60, "pre_ratio": 0.46, "focus": "impact"},
 }
 
 # Templates hidden from the picker by default. Niche-specific layouts are kept

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Player } from "@remotion/player";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Player, type PlayerRef } from "@remotion/player";
 import {
   ClipComposition,
   normalizeCrop,
@@ -16,10 +16,14 @@ import {
 } from "@clipper/video";
 import { api, apiUrl, type CanvasPreset, type Clip, type Job } from "@/lib/api";
 
-type TranscriptWord = { word: string; start: number; end: number };
+type TranscriptWord = { word: string; start: number; end: number; line?: number };
 type TranscriptSegment = { start: number; end: number; text: string; words?: TranscriptWord[] };
 type Transcript = { segments?: TranscriptSegment[] };
 type FaceTrack = { keyframes?: Array<{ t: number; x: number; y: number }> };
+
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
 
 type Props = {
   job: Job;
@@ -48,7 +52,7 @@ type Props = {
  * Preview uses the exact same composition as the renderer (`@clipper/video`),
  * so what the user sees here is what Remotion writes to disk.
  */
-export default function ClipPreview({
+const ClipPreview = forwardRef<{ seekTo: (time: number) => void }, Props>(function ClipPreview({
   job,
   clip,
   canvas,
@@ -68,11 +72,12 @@ export default function ClipPreview({
   cropMode = false,
   onCropChange,
   analysisVersion = 0,
-}: Props) {
+}: Props, ref) {
   const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [faceTrack, setFaceTrack] = useState<FaceTrack | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const playerRef = useRef<PlayerRef | null>(null);
   const dragRef = useRef<{ x: number; y: number; crop: CropSettings } | null>(null);
   const activeCrop = useMemo(() => normalizeCrop(crop), [crop]);
   const layerRef = useRef<HTMLDivElement | null>(null);
@@ -139,6 +144,23 @@ export default function ClipPreview({
   }, [job.id, clip.id, analysisVersion]);
 
   const words = useMemo<Word[]>(() => {
+    const edited = clip.captions?.words;
+    if (Array.isArray(edited) && edited.length > 0) {
+      const duration = Math.max(0.1, clip.end_time - clip.start_time);
+      return edited
+        .map((word) => {
+          const start = Math.max(0, Math.min(duration, Number(word.start) || 0));
+          const end = Math.max(start + 0.01, Math.min(duration, Number(word.end) || start + 0.06));
+          return {
+            word: String(word.word || "").trim(),
+            start: round3(start),
+            end: round3(end),
+            line: typeof word.line === "number" ? word.line : undefined,
+          };
+        })
+        .filter((word) => word.word)
+        .sort((a, b) => a.start - b.start);
+    }
     const all: Word[] = [];
     for (const segment of transcript?.segments || []) {
       for (const word of segment.words || []) {
@@ -147,12 +169,13 @@ export default function ClipPreview({
             word: word.word,
             start: Math.max(0, word.start - clip.start_time),
             end: Math.max(0, word.end - clip.start_time),
+            line: typeof word.line === "number" ? word.line : undefined,
           });
         }
       }
     }
     return all.sort((a, b) => a.start - b.start);
-  }, [transcript, clip.start_time, clip.end_time]);
+  }, [transcript, clip, clip.start_time, clip.end_time, clip.captions]);
 
   const faceKeyframes = useMemo(
     () =>
@@ -253,6 +276,13 @@ export default function ClipPreview({
     }
   };
 
+  useImperativeHandle(ref, () => ({
+    seekTo: (time: number) => {
+      const player = playerRef.current;
+      if (player) player.seekTo(Math.max(0, Math.round(time * 30)));
+    },
+  }), []);
+
   if (error) {
     return (
       <div className="flex aspect-[9/16] w-full items-center justify-center rounded-2xl border border-white/10 bg-black px-6 text-center text-xs text-zinc-500">
@@ -273,6 +303,7 @@ export default function ClipPreview({
           compositionWidth={canvas.width}
           compositionHeight={canvas.height}
           fps={30}
+          ref={playerRef}
           inputProps={inputProps}
           style={{ width: "100%" }}
           controls={!cropMode}
@@ -343,4 +374,6 @@ export default function ClipPreview({
       </div>
     </div>
   );
-}
+});
+
+export default ClipPreview;

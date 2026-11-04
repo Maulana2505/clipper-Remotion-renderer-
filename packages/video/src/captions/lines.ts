@@ -11,8 +11,23 @@ const MAX_GAP_SECONDS = 0.55;
 export function buildLines(words: Word[]): Word[][] {
   const lines: Word[][] = [];
   let current: Word[] = [];
+  const hasLineIds = words.some((word) => typeof word.line === "number");
+
+  const flush = () => {
+    if (current.length > 0) {
+      lines.push(current);
+      current = [];
+    }
+  };
 
   for (const word of words) {
+    if (hasLineIds) {
+      if (current.length > 0 && current[0].line !== word.line) {
+        flush();
+      }
+      current.push(word);
+      continue;
+    }
     if (current.length > 0) {
       const previous = current[current.length - 1];
       const gap = word.start - previous.end;
