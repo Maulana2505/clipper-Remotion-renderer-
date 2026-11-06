@@ -21,7 +21,7 @@ FFMPEG = os.getenv("FFMPEG_BIN", "ffmpeg")
 FFPROBE = os.getenv("FFPROBE_BIN", "ffprobe")
 YTDLP = os.getenv("YTDLP_BIN", "yt-dlp")
 
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "")
 RENDER_ENGINE = os.getenv("RENDER_ENGINE", "ffmpeg").strip().lower()
 RENDER_SERVICE_URL = os.getenv("RENDER_SERVICE_URL", "").strip()
 

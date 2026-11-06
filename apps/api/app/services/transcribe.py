@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from ..core.config import WHISPER_MODEL
-from .models import normalize_model
+from .models import normalize_model, WhisperModelNotSelected
 
 _MODEL = None
 _BATCHED = None
@@ -214,6 +214,9 @@ def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any], on_progress
 
 def _run_transcribe(audio_path: Path, offset: float, duration: float, on_progress=None, model: str | None = None) -> tuple[list[dict], str]:
     cfg = get_whisper_config()
+    chosen = model or cfg["model"]
+    if not chosen:
+        raise WhisperModelNotSelected("Pilih model transkripsi dulu di Settings.")
     if cfg["backend"] == "remote":
         try:
             from .remote_whisper import remote_transcribe
@@ -227,14 +230,14 @@ def _run_transcribe(audio_path: Path, offset: float, duration: float, on_progres
                     "_duration": duration,
                 },
                 on_progress=on_progress,
-                model=model,
+                model=chosen,
             )
-            used = model or cfg["model"]
+            used = chosen
             return segments, f"whisper:remote:{used}"
         except Exception as exc:  # noqa: BLE001
             print(f"[transcribe] remote failed, falling back to local: {exc}")
-    segments = _run_local(audio_path, offset, cfg, on_progress=on_progress, model=model, duration=duration)
-    used = model or cfg["model"]
+    segments = _run_local(audio_path, offset, cfg, on_progress=on_progress, model=chosen, duration=duration)
+    used = chosen
     return segments, f"whisper:local:{used}"
 
 

@@ -224,6 +224,11 @@ def generate_job_transcript(job_id: str, force: bool = False, scope: str = "clip
     if whisper_model is not None and not is_valid_model(whisper_model):
         raise HTTPException(status_code=422, detail="Unknown model. Choose base, small, or large-v3-turbo.")
     chosen_model = normalize_model(whisper_model) if whisper_model else None
+    if not chosen_model:
+        from ..services.transcribe import get_whisper_config
+        chosen_model = get_whisper_config().get("model")
+    if not chosen_model:
+        raise HTTPException(status_code=422, detail="Pilih model transkripsi dulu di Settings (base / small / large-v3-turbo).")
     with get_conn() as conn:
         row = conn.execute("SELECT transcript_path, transcript_scope FROM jobs WHERE id = ?", (job_id,)).fetchone()
     if row is None:
@@ -233,6 +238,7 @@ def generate_job_transcript(job_id: str, force: bool = False, scope: str = "clip
     if is_transcript_running(job_id):
         return {"status": "running", "scope": scope}
     threading.Thread(target=run_transcript, args=(job_id, scope), kwargs={"model": chosen_model}, daemon=True).start()
+    return {"status": "running", "scope": scope}
 
 @router.post("/{job_id}/face-track")
 def generate_job_face_track(job_id: str, force: bool = False):
@@ -256,7 +262,6 @@ def analyze_job(job_id: str, force: bool = False):
     return {"status": "running"}
 
 
-    return {"status": "running", "scope": scope}
 
 
 @router.post("/{job_id}/redetect")

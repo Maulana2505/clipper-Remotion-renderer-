@@ -82,7 +82,7 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [hasTranscript, setHasTranscript] = useState(false);
   const [transcriptScope, setTranscriptScope] = useState<"clips" | "full">("clips");
   const [transcriptBusy, setTranscriptBusy] = useState(false);
-  const [transcriptModel, setTranscriptModel] = useState("small");
+  const [transcriptModel, setTranscriptModel] = useState("");
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem("clipper.transcriptModel");
@@ -415,6 +415,10 @@ export default function StudioClient({ jobId }: { jobId: string }) {
 
   async function generateTranscript(scope: "clips" | "full" = "clips", model: string = transcriptModel) {
     if (!selectedClip || transcriptBusy) return;
+    if (!model) {
+      setError("Pilih model transkripsi dulu (base / small / large-v3-turbo).");
+      return;
+    }
     setTranscriptBusy(true);
     setError(null);
     try {

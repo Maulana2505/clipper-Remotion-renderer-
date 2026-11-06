@@ -24,7 +24,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
   const [baseUrl, setBaseUrl] = useState("");
   const [temperature, setTemperature] = useState(0.3);
   const [maxClips, setMaxClips] = useState(20);
-  const [whisperModel, setWhisperModel] = useState("small");
+  const [whisperModel, setWhisperModel] = useState("");
   const [whisperBackend, setWhisperBackend] = useState<"local" | "remote">("local");
   const [whisperLanguage, setWhisperLanguage] = useState("auto");
   const [whisperMode, setWhisperMode] = useState("balanced");
@@ -60,7 +60,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
     if (!open) return;
     api<WhisperSettings>("/api/settings/whisper")
       .then((data) => {
-        setWhisperModel(data.model || "small");
+        setWhisperModel(data.model || "");
         setWhisperBackend(data.backend === "remote" ? "remote" : "local");
         setWhisperLanguage(data.language || "auto");
         setWhisperMode(data.mode || "balanced");
@@ -135,7 +135,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
       const data = await api<WhisperSettings>("/api/settings/whisper", {
         method: "PUT",
         body: JSON.stringify({
-          model: whisperModel,
+          model: whisperModel || null,
           backend: whisperBackend,
           language: whisperLanguage,
           mode: whisperMode,
@@ -146,7 +146,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
           auto_full_analysis: autoFullAnalysis,
         }),
       });
-      setWhisperModel(data.model);
+      setWhisperModel(data.model || "");
       setWhisperBackend(data.backend === "remote" ? "remote" : "local");
       setWhisperRemoteTokenMasked(data.remote_token_masked || "");
       setWhisperRemoteToken("");
@@ -167,7 +167,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
       const data = await api<{ ok: boolean; message: string }>("/api/settings/whisper/test", {
         method: "POST",
         body: JSON.stringify({
-          model: whisperModel,
+          model: whisperModel || null,
           backend: whisperBackend,
           language: whisperLanguage,
           mode: whisperMode,
@@ -383,8 +383,9 @@ export default function SettingsDrawer({ open, onClose }: Props) {
                   onChange={(e) => setWhisperModel(e.target.value)}
                   className="w-full rounded-xl border border-white/10 bg-[#0c0c0f] px-3 py-2.5 text-sm text-white"
                 >
+                  <option value="">— Pilih model —</option>
                   <option value="base">base — tercepat, kualitas dasar</option>
-                  <option value="small">small — seimbang (default lokal)</option>
+                  <option value="small">small — seimbang</option>
                   <option value="large-v3-turbo">large-v3-turbo — paling akurat (GPU)</option>
                 </select>
               </label>

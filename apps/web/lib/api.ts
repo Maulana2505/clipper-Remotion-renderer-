@@ -165,7 +165,7 @@ export const WHISPER_MODELS: { id: WhisperModel; label: string; hint: string }[]
 ];
 
 export interface WhisperSettings {
-  model: WhisperModel;
+  model: WhisperModel | null;
   backend: "local" | "remote";
   language: string;
   mode: string;

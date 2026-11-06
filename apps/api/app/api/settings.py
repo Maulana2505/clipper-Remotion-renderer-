@@ -21,7 +21,7 @@ def _serialize(row) -> dict:
             "base_url": None,
             "temperature": 0.3,
             "max_clips": 20,
-            "whisper_model": WHISPER_MODEL,
+            "whisper_model": None,
             "whisper_backend": "local",
             "whisper_language": "auto",
             "whisper_mode": "balanced",
@@ -39,7 +39,7 @@ def _serialize(row) -> dict:
         "base_url": data.get("base_url"),
         "temperature": float(data.get("temperature") or 0.3),
         "max_clips": int(data.get("max_clips") or 20),
-        "whisper_model": data.get("whisper_model") or WHISPER_MODEL,
+        "whisper_model": normalize_model(data.get("whisper_model")),
         "whisper_backend": data.get("whisper_backend") or "local",
         "whisper_language": data.get("whisper_language") or "auto",
         "whisper_mode": data.get("whisper_mode") or "balanced",
@@ -128,7 +128,7 @@ def get_whisper_settings():
     data = dict(row) if row else {}
     token = decrypt_secret(data.get("encrypted_remote_token"))
     return {
-        "model": normalize_model(data.get("whisper_model") or WHISPER_MODEL),
+        "model": normalize_model(data.get("whisper_model")),
         "backend": data.get("whisper_backend") or "local",
         "language": data.get("whisper_language") or "auto",
         "mode": data.get("whisper_mode") or "balanced",
@@ -164,7 +164,7 @@ def save_whisper_settings(payload: WhisperSettingsUpdate):
                 updated_at = excluded.updated_at
             """,
             (
-                payload.model,
+                normalize_model(payload.model),
                 payload.backend,
                 payload.language,
                 payload.mode,
@@ -181,7 +181,7 @@ def save_whisper_settings(payload: WhisperSettingsUpdate):
     data = dict(row) if row else {}
     token = decrypt_secret(data.get("encrypted_remote_token"))
     return {
-        "model": normalize_model(data.get("whisper_model") or WHISPER_MODEL),
+        "model": normalize_model(data.get("whisper_model")),
         "backend": data.get("whisper_backend") or "local",
         "language": data.get("whisper_language") or "auto",
         "mode": data.get("whisper_mode") or "balanced",

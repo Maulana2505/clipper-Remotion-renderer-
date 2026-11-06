@@ -91,8 +91,15 @@ def run_full_analysis(job_id: str, force: bool = False) -> None:
             job = row_to_dict(conn.execute("SELECT transcript_scope FROM jobs WHERE id = ?", (job_id,)).fetchone())
         scope = (job or {}).get("transcript_scope") or "clips"
         if force or scope != "full":
-            activity_update("analysis:" + job_id, progress=5)
-            run_transcript(job_id, "full", on_progress=lambda d, t: activity_update("analysis:" + job_id, progress=5 + int(45 * d / max(1, t))))
+            try:
+                from ..services.transcribe import get_whisper_config
+                if get_whisper_config().get("model"):
+                    activity_update("analysis:" + job_id, progress=5)
+                    run_transcript(job_id, "full", on_progress=lambda d, t: activity_update("analysis:" + job_id, progress=5 + int(45 * d / max(1, t))))
+                else:
+                    print("[analysis] no whisper model selected; skipping transcription, face track only.")
+            except Exception as exc:  # noqa: BLE001
+                print(f"[analysis] transcript skipped: {exc}")
         activity_update("analysis:" + job_id, progress=50)
         run_job_face_track(job_id, force=force, on_progress=lambda d, t: activity_update("analysis:" + job_id, progress=50 + int(45 * d / max(1, t))))
         activity_update("analysis:" + job_id, progress=100)

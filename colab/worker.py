@@ -48,7 +48,7 @@ from fastapi.responses import JSONResponse
 app = FastAPI(title="Clipper Whisper Worker")
 
 TOKEN = os.getenv("WORKER_TOKEN", "change-me")
-MODEL_NAME = os.getenv("WHISPER_MODEL", "large-v3-turbo")
+MODEL_NAME = os.getenv("WHISPER_MODEL", "").strip()
 DEVICE_PREF = os.getenv("WHISPER_DEVICE", "cuda").lower()
 COMPUTE_PREF = os.getenv("WHISPER_COMPUTE", "float16")
 ALLOW_CPU_FALLBACK = os.getenv("ALLOW_CPU_FALLBACK", "1") == "1"
@@ -61,10 +61,12 @@ _MODEL_LOCK = __import__("threading").Lock()
 _ALLOWED_MODELS = {"base", "small", "large-v3-turbo"}
 
 
-def _resolve_model(name: str | None) -> str:
+def _resolve_model(name: str | None) -> str | None:
     if name and name in _ALLOWED_MODELS:
         return name
-    return MODEL_NAME if MODEL_NAME in _ALLOWED_MODELS else "small"
+    if MODEL_NAME in _ALLOWED_MODELS:
+        return MODEL_NAME
+    return None
 
 
 def _try_load(name: str, device: str, compute: str):
@@ -75,6 +77,8 @@ def _try_load(name: str, device: str, compute: str):
 def get_model(name: str | None = None):
     global _model, _model_name, _device, _load_error
     resolved = _resolve_model(name)
+    if not resolved:
+        raise ValueError("Model belum dipilih. Kirim model=base|small|large-v3-turbo.")
     with _MODEL_LOCK:
         if _model is not None and _model_name == resolved:
             return _model, resolved
@@ -90,7 +94,13 @@ def get_model(name: str | None = None):
             pass
         errors: list[str] = []
         candidates: list[tuple[str, str]] = []
-        if DEVICE_PREF == "cuda":
+        cuda_ok = False
+        try:
+            import ctranslate2
+            cuda_ok = ctranslate2.get_cuda_device_count() > 0
+        except Exception:  # noqa: BLE001
+            cuda_ok = False
+        if DEVICE_PREF == "cuda" and cuda_ok:
             candidates.append(("cuda", COMPUTE_PREF))
         candidates.append(("cpu", "int8"))
         for device, compute in candidates:
@@ -120,12 +130,12 @@ def _auth(auth_header: str | None):
 @app.get("/health")
 def health(authorization: str | None = Header(None)):
     # Health is open by default; auth optional.
-    cuda_ok = False
+    cuda_devices = 0
     try:
         import ctranslate2
-        cuda_ok = ctranslate2.get_cuda_device_count() > 0
+        cuda_devices = int(ctranslate2.get_cuda_device_count())
     except Exception:  # noqa: BLE001
-        cuda_ok = False
+        cuda_devices = 0
     face_ready = False
     try:
         import cv2  # type: ignore
@@ -134,12 +144,15 @@ def health(authorization: str | None = Header(None)):
         face_ready = False
     return {
         "status": "ok",
-        "model": _model_name or MODEL_NAME,
+        "model": _model_name or MODEL_NAME or None,
         "models": sorted(_ALLOWED_MODELS),
-        "device": _device if _device else DEVICE_PREF,
+        "device": _device if _device else ("cuda" if cuda_devices > 0 else "cpu"),
         "compute": COMPUTE_PREF,
         "model_loaded": _model is not None,
-        "cuda_available": cuda_ok,
+        "model_selected": bool(_model_name or MODEL_NAME),
+        "cuda_devices": cuda_devices,
+        "cuda_available": cuda_devices > 0,
+        "effective_device": _device,
         "load_error": _load_error,
         "face_ready": face_ready,
         "face_model": os.getenv("FACE_MODEL_PATH", ""),
@@ -151,7 +164,10 @@ def health(authorization: str | None = Header(None)):
 def warmup(authorization: str | None = Header(None), model: str = Form("")):
     _auth(authorization)
     try:
-        model, used_model = get_model(model)
+        try:
+            model, used_model = get_model(model)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
         # Transcribe a tiny silent clip to force VAD + model init.
         import tempfile
         from pathlib import Path
@@ -205,7 +221,10 @@ async def transcribe(
         if tmp_path.stat().st_size < 1024:
             raise HTTPException(status_code=422, detail="Uploaded audio is empty/too small.")
 
-        model, used_model = get_model(model)
+        try:
+            model, used_model = get_model(model)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
         lang = None if language == "auto" else language
 
         if mode == "fast":
