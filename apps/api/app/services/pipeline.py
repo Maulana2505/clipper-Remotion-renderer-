@@ -293,28 +293,43 @@ def process_job(job_id: str) -> None:
         )
         total = len(clips)
 
-        # Auto-transcription at queue time (default: clips scope). Off via
-        # TRANSCRIBE_ON_QUEUE=off; full scope available for LLM re-detect.
-        mode = (os.getenv("TRANSCRIBE_ON_QUEUE") or "clips").lower()
-        if mode in ("clips", "full"):
+        # Auto-transcription / full analysis at queue time.
+        try:
+            from ..db import row_to_dict as _rtd
+            with get_conn() as _c:
+                _settings = _rtd(_c.execute("SELECT auto_full_analysis, whisper_backend, remote_whisper_url, encrypted_remote_token FROM app_settings WHERE id = 1").fetchone()) or {}
+        except Exception:  # noqa: BLE001
+            _settings = {}
+        auto_full = bool(_settings.get("auto_full_analysis"))
+        if auto_full:
             update_job(conn, job_id, stage="transcribe", progress=80, error="")
             try:
-                run_transcript(
-                    job_id,
-                    mode,
-                    on_progress=lambda done, tot: update_job(
-                        conn,
-                        job_id,
-                        stage="transcribe",
-                        progress=80 + int(18 * done / max(1, tot)),
-                    ),
-                )
+                from .face_job import run_full_analysis
+                # run synchronously inside the pipeline worker
+                run_full_analysis(job_id, force=True)
             except Exception as exc:  # noqa: BLE001
-                print(f"[pipeline] transcript skipped: {exc}")
+                print(f"[pipeline] full analysis skipped: {exc}")
+        else:
+            mode = (os.getenv("TRANSCRIBE_ON_QUEUE") or "clips").lower()
+            if mode in ("clips", "full"):
+                update_job(conn, job_id, stage="transcribe", progress=80, error="")
+                try:
+                    run_transcript(
+                        job_id,
+                        mode,
+                        on_progress=lambda done, tot: update_job(
+                            conn,
+                            job_id,
+                            stage="transcribe",
+                            progress=80 + int(18 * done / max(1, tot)),
+                        ),
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[pipeline] transcript skipped: {exc}")
 
-        # Auto-refine clip boundaries to word edges (only at queue time).
-        if mode in ("clips", "full"):
-            _refine_clip_boundaries(job_id)
+            # Auto-refine clip boundaries to word edges (only at queue time).
+            if mode in ("clips", "full"):
+                _refine_clip_boundaries(job_id)
 
         update_job(
             conn,

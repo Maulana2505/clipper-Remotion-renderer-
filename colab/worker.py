@@ -126,6 +126,12 @@ def health(authorization: str | None = Header(None)):
         cuda_ok = ctranslate2.get_cuda_device_count() > 0
     except Exception:  # noqa: BLE001
         cuda_ok = False
+    face_ready = False
+    try:
+        import cv2  # type: ignore
+        face_ready = True
+    except Exception:  # noqa: BLE001
+        face_ready = False
     return {
         "status": "ok",
         "model": _model_name or MODEL_NAME,
@@ -135,6 +141,9 @@ def health(authorization: str | None = Header(None)):
         "model_loaded": _model is not None,
         "cuda_available": cuda_ok,
         "load_error": _load_error,
+        "face_ready": face_ready,
+        "face_model": os.getenv("FACE_MODEL_PATH", ""),
+        "opencv": (cv2.__version__ if face_ready else None),
     }
 
 
@@ -268,4 +277,216 @@ async def transcribe(
         try:
             tmp_path.unlink(missing_ok=True)
         except Exception:
+            pass
+
+# --------------------------------------------------------------------------- #
+# Face tracking (Colab). Receives a (preferably pre-sampled) video clip and
+# returns smoothed face keyframes. Reuses the same Bearer token.
+# --------------------------------------------------------------------------- #
+import zipfile as _zipfile
+
+_FACE_MODEL_PATH = os.getenv("FACE_MODEL_PATH", "")
+_FACE_CASCADE_PATH = None
+try:
+    import cv2 as _cv2  # type: ignore
+    _FACE_CASCADE_PATH = _cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+except Exception:  # noqa: BLE001
+    _cv2 = None  # type: ignore
+
+
+def _load_face_detector_cv(width: int, height: int):
+    global _cv2
+    if _cv2 is None:
+        try:
+            import cv2 as _cv2  # type: ignore
+        except Exception:  # noqa: BLE001
+            return None, "none"
+    # YuNet
+    if _FACE_MODEL_PATH and os.path.exists(_FACE_MODEL_PATH):
+        try:
+            det = _cv2.FaceDetectorYN.create(
+                _FACE_MODEL_PATH, "", (width, height),
+                score_threshold=0.6, nms_threshold=0.3, top_k=5000,
+            )
+            det.setInputSize((width, height))
+            return det, "yunet"
+        except Exception:  # noqa: BLE001
+            pass
+    # Haar cascade
+    if _FACE_CASCADE_PATH:
+        try:
+            cascade = _cv2.CascadeClassifier(_FACE_CASCADE_PATH)
+            if not cascade.empty():
+                return cascade, "haar"
+        except Exception:  # noqa: BLE001
+            pass
+    return None, "none"
+
+
+@app.post("/face-track")
+async def face_track(
+    file: UploadFile = File(...),
+    authorization: str | None = Header(None),
+    offset: str = Form("0"),
+    sample_seconds: str = Form("0.4"),
+):
+    _auth(authorization)
+    try:
+        off = float(offset)
+    except ValueError:
+        off = 0.0
+    try:
+        ss = float(sample_seconds)
+    except ValueError:
+        ss = 0.4
+    if ss <= 0:
+        ss = 0.4
+
+    suffix = Path(file.filename or "clip.mp4").suffix or ".mp4"
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    tmp_path = Path(tmp.name)
+    tmp.close()
+    try:
+        with tmp_path.open("wb") as out:
+            shutil.copyfileobj(file.file, out)
+        if tmp_path.stat().st_size < 1024:
+            raise HTTPException(status_code=422, detail="Uploaded video is empty/too small.")
+
+        try:
+            import cv2  # type: ignore
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=500, detail=f"opencv unavailable: {exc}")
+
+        capture = cv2.VideoCapture(str(tmp_path))
+        if not capture.isOpened():
+            raise HTTPException(status_code=422, detail="Could not open video.")
+
+        fps = float(capture.get(cv2.CAP_PROP_FPS) or 0.0)
+        if fps <= 1 or fps > 240:
+            fps = 1.0 / ss
+        step = max(1, int(round(fps * ss)))
+
+        detector = None
+        detector_kind = "none"
+        detector_size = None
+
+        keyframes: list[dict] = []
+        smoothed_x = 0.5
+        smoothed_y = 0.5
+        found_any = False
+        frame_index = 0
+        t = 0.0
+        duration = 0.0
+
+        while True:
+            ok = capture.grab()
+            if not ok:
+                break
+            if frame_index % step != 0:
+                frame_index += 1
+                t = frame_index / fps
+                continue
+            ok, frame = capture.retrieve()
+            if not ok or frame is None:
+                break
+            height, width = frame.shape[:2]
+            # downscale
+            if width > 480:
+                scale = 480.0 / float(width)
+                new_w = 480
+                new_h = max(1, int(height * scale))
+                frame_small = cv2.resize(frame, (new_w, new_h))
+            else:
+                new_w, new_h = width, height
+                frame_small = frame
+            sh, sw = frame_small.shape[:2]
+
+            if detector is None:
+                loaded = _load_face_detector_cv(sw, sh)
+                if isinstance(loaded, tuple):
+                    detector, detector_kind = loaded
+                    detector_size = (sw, sh)
+                else:
+                    detector = loaded
+                    detector_kind = "none"
+
+            center = None
+            if detector_kind == "yunet" and detector is not None:
+                try:
+                    if detector_size != (sw, sh):
+                        detector.setInputSize((sw, sh))
+                        detector_size = (sw, sh)
+                    _retval, faces = detector.detect(frame_small)
+                    if faces is not None and len(faces) > 0:
+                        areas = [f[2] * f[3] for f in faces]
+                        idx = int(max(range(len(faces)), key=lambda i: areas[i]))
+                        f = faces[idx]
+                        center = ((f[0] + f[2] / 2) / max(1, sw),
+                                  (f[1] + f[3] / 2) / max(1, sh))
+                except Exception:  # noqa: BLE001
+                    center = None
+            if center is None and detector_kind == "haar" and detector is not None:
+                try:
+                    gray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY)
+                    faces = detector.detectMultiScale(gray, scaleFactor=1.12, minNeighbors=4, minSize=(24, 24))
+                    if len(faces) > 0:
+                        faces = sorted(faces, key=lambda item: item[2] * item[3], reverse=True)
+                        x, y, w, h = faces[0]
+                        center = ((x + w / 2) / max(1, sw), (y + h / 2) / max(1, sh))
+                except Exception:  # noqa: BLE001
+                    center = None
+
+            if center is not None:
+                cx, cy = center
+                smoothed_x = smoothed_x * 0.75 + cx * 0.25
+                smoothed_y = smoothed_y * 0.75 + cy * 0.25
+                found_any = True
+
+            keyframes.append({
+                "t": round(float(t + off), 3),
+                "x": round(float(smoothed_x), 4),
+                "y": round(float(smoothed_y), 4),
+                "w": 1.0,
+                "h": 1.0,
+            })
+            duration = t
+            frame_index += 1
+            t = frame_index / fps
+            if frame_index > 100000:
+                break
+
+        capture.release()
+
+        if not found_any or not keyframes:
+            # fallback center
+            dur = max(0.1, duration if duration > 0 else (len(keyframes) / fps if fps > 0 else 1.0))
+            return JSONResponse({
+                "fallback": True,
+                "reason": "no face detected",
+                "detector": detector_kind,
+                "keyframes": [{"t": round(off, 3), "x": 0.5, "y": 0.5, "w": 1.0, "h": 1.0},
+                              {"t": round(off + dur, 3), "x": 0.5, "y": 0.5, "w": 1.0, "h": 1.0}],
+            })
+
+        # thin out
+        if len(keyframes) > 400:
+            step_out = max(1, len(keyframes) // 400)
+            keyframes = keyframes[::step_out] + [keyframes[-1]]
+
+        return JSONResponse({
+            "fallback": False,
+            "reason": "",
+            "detector": detector_kind,
+            "keyframes": keyframes,
+        })
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        tb = traceback.format_exc()
+        print(tb, flush=True)
+        raise HTTPException(status_code=500, detail={"error": type(exc).__name__, "detail": str(exc), "traceback": tb[-2000:]})
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001
             pass

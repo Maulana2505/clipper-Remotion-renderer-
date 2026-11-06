@@ -32,6 +32,8 @@ export default function SettingsDrawer({ open, onClose }: Props) {
   const [whisperRemoteUrl, setWhisperRemoteUrl] = useState("");
   const [whisperRemoteToken, setWhisperRemoteToken] = useState("");
   const [whisperRemoteTokenMasked, setWhisperRemoteTokenMasked] = useState("");
+  const [faceBackend, setFaceBackend] = useState<"local" | "remote">("local");
+  const [autoFullAnalysis, setAutoFullAnalysis] = useState(false);
   const [whisperBusy, setWhisperBusy] = useState(false);
   const [whisperTesting, setWhisperTesting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,6 +67,8 @@ export default function SettingsDrawer({ open, onClose }: Props) {
         setWhisperHotwords(data.hotwords || "");
         setWhisperRemoteUrl(data.remote_url || "");
         setWhisperRemoteTokenMasked(data.remote_token_masked || "");
+        setFaceBackend(data.face_backend === "remote" ? "remote" : "local");
+        setAutoFullAnalysis(Boolean(data.auto_full_analysis));
         setWhisperRemoteToken("");
       })
       .catch(() => {});
@@ -138,12 +142,16 @@ export default function SettingsDrawer({ open, onClose }: Props) {
           hotwords: whisperHotwords.trim() || null,
           remote_url: whisperRemoteUrl.trim() || null,
           remote_token: whisperRemoteToken.trim() ? whisperRemoteToken.trim() : undefined,
+          face_backend: faceBackend,
+          auto_full_analysis: autoFullAnalysis,
         }),
       });
       setWhisperModel(data.model);
       setWhisperBackend(data.backend === "remote" ? "remote" : "local");
       setWhisperRemoteTokenMasked(data.remote_token_masked || "");
       setWhisperRemoteToken("");
+      setFaceBackend(data.face_backend === "remote" ? "remote" : "local");
+      setAutoFullAnalysis(Boolean(data.auto_full_analysis));
       setMessage({ kind: "ok", text: "Whisper settings saved." });
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : "Save failed." });
@@ -339,6 +347,34 @@ export default function SettingsDrawer({ open, onClose }: Props) {
               </div>
             ) : null}
 
+            <div className="space-y-2 rounded-xl border border-white/10 bg-[#0c0c0f] p-3">
+              <label className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-white">Face tracking pakai Colab</div>
+                  <p className="text-xs text-zinc-500">Track semua clip di GPU Colab (kirim potongan video).</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFaceBackend(faceBackend === "remote" ? "local" : "remote")}
+                  className={`relative h-6 w-11 rounded-full transition ${faceBackend === "remote" ? "bg-lime" : "bg-white/10"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${faceBackend === "remote" ? "left-5" : "left-0.5"}`} />
+                </button>
+              </label>
+              <label className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-white">Auto full analysis setelah queue</div>
+                  <p className="text-xs text-zinc-500">Transkrip full + face track semua clip otomatis.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAutoFullAnalysis((v) => !v)}
+                  className={`relative h-6 w-11 rounded-full transition ${autoFullAnalysis ? "bg-lime" : "bg-white/10"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${autoFullAnalysis ? "left-5" : "left-0.5"}`} />
+                </button>
+              </label>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <label className="block">
                 <span className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">Model</span>

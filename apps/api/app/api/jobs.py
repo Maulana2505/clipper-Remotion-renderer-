@@ -17,6 +17,7 @@ from ..services.pipeline import process_job
 from ..services.redetect import is_running as is_redetect_running
 from ..services.redetect import redetect_clips, redetect_status
 from ..services.transcript_job import is_running as is_transcript_running, run_transcript
+from ..services.face_job import run_job_face_track, run_full_analysis
 from ..templates import NICHE_BY_ID
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -232,6 +233,29 @@ def generate_job_transcript(job_id: str, force: bool = False, scope: str = "clip
     if is_transcript_running(job_id):
         return {"status": "running", "scope": scope}
     threading.Thread(target=run_transcript, args=(job_id, scope), kwargs={"model": chosen_model}, daemon=True).start()
+
+@router.post("/{job_id}/face-track")
+def generate_job_face_track(job_id: str, force: bool = False):
+    """Opt-in face tracking for every clip of a job. Runs in the background."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    threading.Thread(target=run_job_face_track, args=(job_id, force), daemon=True).start()
+    return {"status": "running"}
+
+
+@router.post("/{job_id}/analyze")
+def analyze_job(job_id: str, force: bool = False):
+    """Run full transcription + face tracking for all clips (background)."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    threading.Thread(target=run_full_analysis, args=(job_id, force), daemon=True).start()
+    return {"status": "running"}
+
+
     return {"status": "running", "scope": scope}
 
 

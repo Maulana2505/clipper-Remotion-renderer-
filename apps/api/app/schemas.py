@@ -140,6 +140,8 @@ class WhisperSettingsUpdate(BaseModel):
     hotwords: str | None = Field(default=None, max_length=500)
     remote_url: str | None = Field(default=None, max_length=500)
     remote_token: str | None = Field(default=None, max_length=500)
+    face_backend: str | None = Field(default=None, pattern="^(local|remote)$")
+    auto_full_analysis: bool | None = None
 
 
 __all__ = [

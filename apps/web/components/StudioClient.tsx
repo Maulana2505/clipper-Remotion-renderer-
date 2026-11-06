@@ -102,6 +102,8 @@ export default function StudioClient({ jobId }: { jobId: string }) {
   const [redetectBusy, setRedetectBusy] = useState(false);
   const [redetectMode, setRedetectMode] = useState<"merge" | "replace">("merge");
   const [faceBusy, setFaceBusy] = useState(false);
+  const [allFaceBusy, setAllFaceBusy] = useState(false);
+  const [fullAnalysisBusy, setFullAnalysisBusy] = useState(false);
   const [faceReady, setFaceReady] = useState(false);
   const clipsLoaded = useRef(false);
   const selectedIdRef = useRef<string | null>(null);
@@ -437,6 +439,34 @@ export default function StudioClient({ jobId }: { jobId: string }) {
     } catch (err) {
       setFaceBusy(false);
       setError(err instanceof Error ? err.message : "Could not start face tracking.");
+    }
+  }
+
+  async function generateAllFaceTracks() {
+    if (allFaceBusy) return;
+    setAllFaceBusy(true);
+    setError(null);
+    try {
+      await api(`/api/jobs/${jobId}/face-track`, { method: "POST" });
+      setNotice("Face track semua clip dimulai.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start face tracking.");
+    } finally {
+      setAllFaceBusy(false);
+    }
+  }
+
+  async function runFullAnalysis() {
+    if (fullAnalysisBusy) return;
+    setFullAnalysisBusy(true);
+    setError(null);
+    try {
+      await api(`/api/jobs/${jobId}/analyze`, { method: "POST" });
+      setNotice("Full analysis dimulai (transkrip + face track).");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start full analysis.");
+    } finally {
+      setFullAnalysisBusy(false);
     }
   }
 
@@ -792,6 +822,10 @@ function StylePanel({
   faceBusy,
   faceReady,
   onGenerateFaceTrack,
+  onFullAnalysis,
+  onAllFaceTrack,
+  fullAnalysisBusy,
+  allFaceBusy,
   redetectBusy,
   redetectMode,
   onRedetect,
@@ -823,6 +857,10 @@ function StylePanel({
   faceBusy: boolean;
   faceReady: boolean;
   onGenerateFaceTrack: () => void;
+  onFullAnalysis?: () => void;
+  onAllFaceTrack?: () => void;
+  fullAnalysisBusy?: boolean;
+  allFaceBusy?: boolean;
   redetectBusy: boolean;
   redetectMode: "merge" | "replace";
   onRedetect: (mode: "merge" | "replace") => void;
@@ -1153,6 +1191,24 @@ function StylePanel({
                 <CaptionLayoutEditor clip={clip} patchClip={patchClip} applyAll={applyLayoutAll} />
               </div>
             ) : null}
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onFullAnalysis?.()}
+                disabled={fullAnalysisBusy || false}
+                className="flex items-center justify-center gap-2 rounded-lg border border-lime/25 bg-lime/10 px-3 py-2 text-[11px] font-semibold text-lime hover:bg-lime/15 disabled:opacity-50"
+              >
+                {fullAnalysisBusy ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                {fullAnalysisBusy ? "Memulai…" : "Full analysis (Colab)"}
+              </button>
+              <button
+                onClick={() => onAllFaceTrack?.()}
+                disabled={allFaceBusy || false}
+                className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] font-medium text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+              >
+                {allFaceBusy ? <Loader2 size={12} className="animate-spin" /> : <ScanFace size={12} />}
+                {allFaceBusy ? "Memulai…" : "Face track semua clip"}
+              </button>
+            </div>
             {captionTemplates.map((template) => (
               <TemplateButton
                 key={template.id}

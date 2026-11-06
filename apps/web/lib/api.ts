@@ -172,6 +172,8 @@ export interface WhisperSettings {
   hotwords?: string | null;
   remote_url?: string | null;
   remote_token_masked?: string;
+  face_backend?: "local" | "remote";
+  auto_full_analysis?: boolean;
 }
 
 export interface LlmSettings {

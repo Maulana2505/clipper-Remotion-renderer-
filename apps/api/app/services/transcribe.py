@@ -121,7 +121,7 @@ def _mode_params(mode: str) -> dict[str, Any]:
     return {"beam_size": 5, "best_of": 5, "temperature": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0], "batched": False}
 
 
-def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any], on_progress=None, model: str | None = None) -> list[dict]:
+def _run_local(audio_path: Path, offset: float, cfg: dict[str, Any], on_progress=None, model: str | None = None, duration: float = 0.0) -> list[dict]:
     model, batched, device = _load_models(model or cfg["model"])
     params = _mode_params(cfg["mode"])
     language = None if cfg["language"] == "auto" else cfg["language"]
@@ -233,7 +233,7 @@ def _run_transcribe(audio_path: Path, offset: float, duration: float, on_progres
             return segments, f"whisper:remote:{used}"
         except Exception as exc:  # noqa: BLE001
             print(f"[transcribe] remote failed, falling back to local: {exc}")
-    segments = _run_local(audio_path, offset, cfg, on_progress=on_progress, model=model)
+    segments = _run_local(audio_path, offset, cfg, on_progress=on_progress, model=model, duration=duration)
     used = model or cfg["model"]
     return segments, f"whisper:local:{used}"
 

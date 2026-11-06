@@ -6,6 +6,16 @@ from pathlib import Path
 from ..core.config import FACE_MAX_WIDTH, FACE_MODEL_PATH, FACE_SAMPLE_SECONDS
 
 
+def _face_backend() -> str:
+    try:
+        from ..db import get_conn, row_to_dict
+        with get_conn() as conn:
+            row = row_to_dict(conn.execute("SELECT face_backend FROM app_settings WHERE id = 1").fetchone())
+        return (row or {}).get("face_backend") or "local"
+    except Exception:  # noqa: BLE001
+        return "local"
+
+
 def _fallback(duration: float, reason: str) -> dict:
     duration = max(0.1, duration)
     return {
@@ -53,7 +63,7 @@ def _load_yunet(width: int, height: int):
     return None
 
 
-def track_faces(source: Path, start: float, end: float, on_progress=None) -> dict:
+def track_faces_local(source: Path, start: float, end: float, on_progress=None) -> dict:
     duration = max(0.1, float(end) - float(start))
     try:
         import cv2  # type: ignore
@@ -203,3 +213,13 @@ def track_faces(source: Path, start: float, end: float, on_progress=None) -> dic
         }
     except Exception as exc:  # noqa: BLE001
         return _fallback(duration, f"face tracking failed: {exc}")
+
+def track_faces(source: Path, start: float, end: float, on_progress=None) -> dict:
+    if _face_backend() == "remote":
+        try:
+            from .remote_face import is_configured, remote_face_track
+            if is_configured():
+                return remote_face_track(source, start, end, on_progress=on_progress)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[face] remote failed, falling back to local: {exc}")
+    return track_faces_local(source, start, end, on_progress=on_progress)

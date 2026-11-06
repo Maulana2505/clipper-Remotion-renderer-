@@ -46,6 +46,8 @@ def _serialize(row) -> dict:
         "whisper_hotwords": data.get("whisper_hotwords"),
         "remote_whisper_url": data.get("remote_whisper_url"),
         "remote_token_masked": mask_secret(decrypt_secret(data.get("encrypted_remote_token"))),
+        "face_backend": data.get("face_backend") or "local",
+        "auto_full_analysis": bool(data.get("auto_full_analysis")), 
         "api_key_masked": mask_secret(api_key),
         "configured": bool(api_key),
         "updated_at": data.get("updated_at"),
@@ -133,6 +135,8 @@ def get_whisper_settings():
         "hotwords": data.get("whisper_hotwords"),
         "remote_url": data.get("remote_whisper_url"),
         "remote_token_masked": mask_secret(token),
+        "face_backend": data.get("face_backend") or "local",
+        "auto_full_analysis": bool(data.get("auto_full_analysis")), 
     }
 
 
@@ -145,8 +149,8 @@ def save_whisper_settings(payload: WhisperSettingsUpdate):
             encrypted = encrypt_secret(payload.remote_token.strip()) if payload.remote_token.strip() else None
         conn.execute(
             """
-            INSERT INTO app_settings (id, provider, model, temperature, max_clips, whisper_model, whisper_backend, whisper_language, whisper_mode, whisper_hotwords, remote_whisper_url, encrypted_remote_token, updated_at)
-            VALUES (1, 'openai', 'gpt-4o-mini', 0.3, 20, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO app_settings (id, provider, model, temperature, max_clips, whisper_model, whisper_backend, whisper_language, whisper_mode, whisper_hotwords, remote_whisper_url, encrypted_remote_token, face_backend, auto_full_analysis, updated_at)
+            VALUES (1, 'openai', 'gpt-4o-mini', 0.3, 20, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 whisper_model = excluded.whisper_model,
                 whisper_backend = excluded.whisper_backend,
@@ -155,6 +159,8 @@ def save_whisper_settings(payload: WhisperSettingsUpdate):
                 whisper_hotwords = excluded.whisper_hotwords,
                 remote_whisper_url = excluded.remote_whisper_url,
                 encrypted_remote_token = excluded.encrypted_remote_token,
+                face_backend = excluded.face_backend,
+                auto_full_analysis = excluded.auto_full_analysis,
                 updated_at = excluded.updated_at
             """,
             (
@@ -165,6 +171,8 @@ def save_whisper_settings(payload: WhisperSettingsUpdate):
                 payload.hotwords,
                 payload.remote_url,
                 encrypted,
+                payload.face_backend if payload.face_backend is not None else "local",
+                1 if payload.auto_full_analysis else 0,
                 now_iso(),
             ),
         )
@@ -180,6 +188,8 @@ def save_whisper_settings(payload: WhisperSettingsUpdate):
         "hotwords": data.get("whisper_hotwords"),
         "remote_url": data.get("remote_whisper_url"),
         "remote_token_masked": mask_secret(token),
+        "face_backend": data.get("face_backend") or "local",
+        "auto_full_analysis": bool(data.get("auto_full_analysis")), 
     }
 
 
