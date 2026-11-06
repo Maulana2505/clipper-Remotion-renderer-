@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { cropRoom, normalizeCrop, type CropSettings } from "@clipper/video";
 import ClipPreview from "@/components/ClipPreview";
-import CaptionEditor from "@/components/CaptionEditor";
+import CaptionLayoutEditor from "@/components/CaptionLayoutEditor";
 import {
   api,
   apiUrl,
@@ -854,6 +854,7 @@ function StylePanel({
   }, [videoTemplates]);
 
   const [confirmReplace, setConfirmReplace] = useState(false);
+  const [applyLayoutAll, setApplyLayoutAll] = useState(false);
   if (!clip) return null;
   return (
     <aside className="h-fit rounded-2xl border border-white/10 bg-panel p-4 xl:sticky xl:top-20">
@@ -1139,15 +1140,17 @@ function StylePanel({
               </button>
             </div>
             {clip ? (
-              <div className="mb-3">
-                <CaptionEditor
-                  jobId={jobId}
-                  clip={clip}
-                  duration={Math.max(0.1, clip.end_time - clip.start_time)}
-                  hasTranscript={hasTranscript}
-                  onPatch={patchClip}
-                  onSeek={onSeek}
-                />
+              <div className="mb-3 space-y-2">
+                <label className="flex items-center gap-2 text-[10px] text-zinc-400">
+                  <input
+                    type="checkbox"
+                    checked={applyLayoutAll}
+                    onChange={(e) => setApplyLayoutAll(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-lime"
+                  />
+                  Terapkan ke semua clip
+                </label>
+                <CaptionLayoutEditor clip={clip} patchClip={patchClip} applyAll={applyLayoutAll} />
               </div>
             ) : null}
             {captionTemplates.map((template) => (

@@ -144,23 +144,6 @@ const ClipPreview = forwardRef<{ seekTo: (time: number) => void }, Props>(functi
   }, [job.id, clip.id, analysisVersion]);
 
   const words = useMemo<Word[]>(() => {
-    const edited = clip.captions?.words;
-    if (Array.isArray(edited) && edited.length > 0) {
-      const duration = Math.max(0.1, clip.end_time - clip.start_time);
-      return edited
-        .map((word) => {
-          const start = Math.max(0, Math.min(duration, Number(word.start) || 0));
-          const end = Math.max(start + 0.01, Math.min(duration, Number(word.end) || start + 0.06));
-          return {
-            word: String(word.word || "").trim(),
-            start: round3(start),
-            end: round3(end),
-            line: typeof word.line === "number" ? word.line : undefined,
-          };
-        })
-        .filter((word) => word.word)
-        .sort((a, b) => a.start - b.start);
-    }
     const all: Word[] = [];
     for (const segment of transcript?.segments || []) {
       for (const word of segment.words || []) {
@@ -169,13 +152,12 @@ const ClipPreview = forwardRef<{ seekTo: (time: number) => void }, Props>(functi
             word: word.word,
             start: Math.max(0, word.start - clip.start_time),
             end: Math.max(0, word.end - clip.start_time),
-            line: typeof word.line === "number" ? word.line : undefined,
           });
         }
       }
     }
     return all.sort((a, b) => a.start - b.start);
-  }, [transcript, clip, clip.start_time, clip.end_time, clip.captions]);
+  }, [transcript, clip.start_time, clip.end_time]);
 
   const faceKeyframes = useMemo(
     () =>
@@ -208,6 +190,7 @@ const ClipPreview = forwardRef<{ seekTo: (time: number) => void }, Props>(functi
         font: (fontPreset as FontId) || "anton",
         accent,
         enabled: captionEnabled,
+        layout: (clip.caption_layout as any) || undefined,
       },
       words,
       face: { keyframes: faceKeyframes },

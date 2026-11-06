@@ -1,9 +1,9 @@
 import React, {useMemo} from 'react';
 import {spring, useCurrentFrame, useVideoConfig} from 'remotion';
-import type {CaptionId, CanvasSpec, FontId, Word} from '../types';
-import {safeAreaOf} from '../types';
+import type {CaptionId, CaptionLayout, CanvasSpec, FontId, Word} from '../types';
+import {captionLayoutOf, safeAreaOf} from '../types';
 import {fontFamilyOf} from '../fonts';
-import {activeCaption} from './lines';
+import {captionBlock} from './lines';
 
 type Spec = {
   fontSizeScale: number;
@@ -167,30 +167,43 @@ export const CaptionLayer: React.FC<{
   /** Clip-relative time in seconds. */
   time: number;
   enabled: boolean;
-}> = ({words, template, font, accent, canvas, time, enabled}) => {
+  layout?: Partial<CaptionLayout>;
+}> = ({words, template, font, accent, canvas, time, enabled, layout}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const current = useMemo(() => activeCaption(words, time), [words, time]);
+  const block = useMemo(() => captionBlock(words, time, layout), [words, time, layout]);
 
-  if (!enabled || template === 'none' || !current) {
+  if (!enabled || template === 'none' || !block) {
     return null;
   }
 
   const safe = safeAreaOf(canvas);
   const fontSize = Math.max(28, Math.min(canvas.width, canvas.height) * 0.062);
   const spec = resolveSpec(template, accent, fontSize);
-  const size = fontSize * spec.fontSizeScale;
-  const startFrame = Math.round(current.start * fps);
+  const startFrame = Math.round(block.start * fps);
   const linePop = spring({frame: frame - startFrame, fps, config: {damping: 12, stiffness: 220}});
   const wordPop = spring({frame: frame - startFrame, fps, config: {damping: 9, stiffness: 260}});
-  const visible = spec.typewriter && current.active >= 0 ? current.line.slice(0, current.active + 1) : current.line;
+  const visibleLines = block.lines;
+
+  const lay = captionLayoutOf(layout);
+  const size = fontSize * spec.fontSizeScale * lay.font_scale;
+  const maxWFrac = 1 - safe.left - safe.right;
+  const wFrac = Math.min(lay.width, maxWFrac);
+  const leftFrac =
+    lay.align === 'left' ? safe.left :
+    lay.align === 'right' ? 1 - safe.right - wFrac :
+    (1 - wFrac) / 2;
+  const alignItems =
+    lay.align === 'left' ? 'flex-start' :
+    lay.align === 'right' ? 'flex-end' : 'center';
+  const textAlign = lay.align;
 
   const containerStyle: React.CSSProperties = {
     fontFamily: fontFamilyOf(font),
     fontSize: size,
     fontWeight: 800,
     lineHeight: 1.06,
-    textAlign: 'center',
+    textAlign,
     color: '#ffffff',
     textTransform: spec.uppercase ? 'uppercase' : 'none',
     letterSpacing: '0.01em',
@@ -202,38 +215,63 @@ export const CaptionLayer: React.FC<{
     <div
       style={{
         position: 'absolute',
-        left: canvas.width * Math.max(safe.left, 0.04),
-        right: canvas.width * Math.max(safe.right, 0.04),
-        bottom: canvas.height * safe.bottom,
+        left: canvas.width * leftFrac,
+        width: canvas.width * wFrac,
+        top: canvas.height * lay.y,
+        transform: 'translateY(-50%)',
         display: 'flex',
-        justifyContent: 'center',
+        flexDirection: 'column',
+        alignItems,
+        gap: size * lay.line_gap,
         pointerEvents: 'none',
       }}
     >
-      <div
-        style={{
-          ...containerStyle,
-          transform: spec.linePop ? `scale(${0.9 + linePop * 0.1})` : undefined,
-        }}
-      >
-        {visible.map((word, index) => {
-          const isActive = index === current.active;
-          const wordStyle: React.CSSProperties = {
-            display: 'inline-block',
-            marginRight: '0.24em',
-            ...spec.word,
-            ...(isActive ? spec.active : undefined),
-          };
-          if (spec.activePop && isActive) {
-            wordStyle.transform = `scale(${1 + wordPop * 0.08})`;
+      {visibleLines.map((line, li) => {
+        const isLineActive = li === block.activeLine;
+        let visibleWords = line;
+        if (spec.typewriter) {
+          if (li < block.activeLine) visibleWords = line;
+          else if (li === block.activeLine) {
+            visibleWords = block.activeWord >= 0 ? line.slice(0, block.activeWord + 1) : [];
+          } else {
+            visibleWords = [];
           }
-          return (
-            <span key={`${word.word}-${index}`} style={wordStyle}>
-              {word.word}
-            </span>
-          );
-        })}
-      </div>
+        }
+        if (visibleWords.length === 0) return null;
+        const lineStartFrame = Math.round(line[0].start * fps);
+        const pop = spec.linePop ? spring({frame: frame - lineStartFrame, fps, config: {damping: 12, stiffness: 220}}) : 1;
+        return (
+          <div
+            key={li}
+            style={{
+              ...containerStyle,
+              transform: spec.linePop ? `scale(${0.9 + pop * 0.1})` : undefined,
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: lay.align === 'left' ? 'flex-start' : lay.align === 'right' ? 'flex-end' : 'center',
+            }}
+          >
+            {visibleWords.map((word, index) => {
+              const isActive = isLineActive && index === block.activeWord;
+              const wordStyle: React.CSSProperties = {
+                display: 'inline-block',
+                marginRight: '0.24em',
+                ...spec.word,
+                ...(isActive ? spec.active : undefined),
+              };
+              if (spec.activePop && isActive) {
+                const wp = spring({frame: frame - startFrame, fps, config: {damping: 9, stiffness: 260}});
+                wordStyle.transform = `scale(${1 + wp * 0.08})`;
+              }
+              return (
+                <span key={`${word.word}-${index}`} style={wordStyle}>
+                  {word.word}
+                </span>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 };

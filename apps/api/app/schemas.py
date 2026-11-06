@@ -84,20 +84,16 @@ class ChannelUpdate(BaseModel):
     notes: str | None = None
 
 
-class CaptionWord(BaseModel):
-    """One word in a clip's editable caption track (clip-relative seconds)."""
+class CaptionLayout(BaseModel):
+    """Layout/arrangement of captions on the rendered clip."""
 
-    word: str = Field(min_length=1, max_length=120)
-    start: float = Field(default=0.0, ge=0.0)
-    end: float = Field(default=0.0, ge=0.0)
-    line: int = Field(default=0, ge=0)
-
-
-class CaptionTrack(BaseModel):
-    """Editable caption track for a clip (clip-relative seconds)."""
-
-    version: int = 1
-    words: list[CaptionWord] = Field(default_factory=list)
+    lines_on_screen: int = Field(default=2, ge=1, le=3)
+    words_per_line: int = Field(default=4, ge=2, le=6)
+    y: float = Field(default=0.84, ge=0.05, le=0.95)
+    align: Literal["left", "center", "right"] = "center"
+    width: float = Field(default=0.86, ge=0.35, le=0.98)
+    font_scale: float = Field(default=1.0, ge=0.6, le=1.6)
+    line_gap: float = Field(default=0.18, ge=0.0, le=0.6)
 
 
 class ClipPatch(BaseModel):
@@ -113,7 +109,7 @@ class ClipPatch(BaseModel):
     meta: JobMeta | None = None
     crop: CropSettings | None = None
     overlays: list[OverlaySettings] | None = None
-    captions: CaptionTrack | None = None
+    caption_layout: CaptionLayout | None = None
 
 
 class RenderRequest(BaseModel):

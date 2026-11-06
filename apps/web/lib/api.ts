@@ -77,7 +77,15 @@ export interface Clip {
   meta?: ClipMeta | null;
   crop?: CropSettings | null;
   overlays?: OverlaySettings[] | null;
-  captions?: { version?: number; words: Array<{ word: string; start: number; end: number; line?: number }> } | null;
+  caption_layout?: {
+    lines_on_screen?: number;
+    words_per_line?: number;
+    y?: number;
+    align?: "left" | "center" | "right";
+    width?: number;
+    font_scale?: number;
+    line_gap?: number;
+  } | null;
   face_track_path?: string | null;
   created_at: string;
 }

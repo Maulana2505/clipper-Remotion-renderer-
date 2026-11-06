@@ -4,5 +4,5 @@ export * from './presets';
 export * from './media';
 export * from './Clip';
 export {CaptionLayer} from './captions/CaptionLayer';
-export {buildLines, activeCaption} from './captions/lines';
+export {buildLines, activeCaption, captionBlock} from './captions/lines';
 export {ClipLayout} from './layouts/Layouts';

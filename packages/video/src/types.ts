@@ -8,7 +8,49 @@ export type CanvasSpec = {
   safe_area?: SafeArea;
 };
 
-export type Word = {word: string; start: number; end: number; line?: number};
+export type Word = {word: string; start: number; end: number};
+
+export type CaptionLayout = {
+  lines_on_screen: number;
+  words_per_line: number;
+  y: number;
+  align: 'left' | 'center' | 'right';
+  width: number;
+  font_scale: number;
+  line_gap: number;
+};
+
+export const DEFAULT_CAPTION_LAYOUT: CaptionLayout = {
+  lines_on_screen: 2,
+  words_per_line: 4,
+  y: 0.84,
+  align: 'center',
+  width: 0.86,
+  font_scale: 1,
+  line_gap: 0.18,
+};
+
+export function captionLayoutOf(input: Partial<CaptionLayout> | null | undefined): CaptionLayout {
+  const base = DEFAULT_CAPTION_LAYOUT;
+  if (!input) return base;
+  return {
+    lines_on_screen: clampInt(input.lines_on_screen ?? base.lines_on_screen, 1, 3),
+    words_per_line: clampInt(input.words_per_line ?? base.words_per_line, 2, 6),
+    y: clampNum(input.y ?? base.y, 0.05, 0.95),
+    align: (input.align as CaptionLayout['align']) ?? base.align,
+    width: clampNum(input.width ?? base.width, 0.35, 0.98),
+    font_scale: clampNum(input.font_scale ?? base.font_scale, 0.6, 1.6),
+    line_gap: clampNum(input.line_gap ?? base.line_gap, 0, 0.6),
+  };
+}
+
+function clampNum(v: number, lo: number, hi: number): number {
+  if (typeof v !== 'number' || Number.isNaN(v)) return lo;
+  return Math.max(lo, Math.min(hi, v));
+}
+function clampInt(v: number, lo: number, hi: number): number {
+  return Math.round(clampNum(v, lo, hi));
+}
 
 export type FaceKeyframe = {t: number; x: number; y: number};
 
@@ -145,7 +187,7 @@ export type ClipProps = {
   layout: LayoutId;
   crop?: CropSettings;
   overlays?: OverlaySettings[];
-  caption: {template: CaptionId; font: FontId; accent: string; enabled: boolean};
+  caption: {template: CaptionId; font: FontId; accent: string; enabled: boolean; layout?: CaptionLayout};
   words: Word[];
   face?: {keyframes: FaceKeyframe[]};
   meta?: ClipMeta;
